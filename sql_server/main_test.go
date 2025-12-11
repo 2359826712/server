@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 )
- 
+
 func TestClient(t *testing.T) {
 	client := service.InitClient()
 	err := client.CreateNewTable("fifa2")
