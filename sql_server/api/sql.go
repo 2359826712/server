@@ -62,55 +62,36 @@ func QueryApi(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if q.OnlineDuration == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "在线时长不能为0"})
+		return
+	}
 	if list, err := mysql_server.MysqlService.Query(&q); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	} else {
-		var data interface{} = nil
-		if len(list) > 0 {
-			data = list[0]
-		}
 		c.JSON(http.StatusOK, gin.H{
 			"message": "query success",
-			"data":    data,
+			"data":    list,
 		})
 	}
 }
 
-func UpdateApi(c *gin.Context) {
-	var game model.BaseInfo
-	if err := c.ShouldBindJSON(&game); err != nil {
+func ClearTalkChannelApi(c *gin.Context) {
+	var q = &request.QueryReq{}
+	if err := c.ShouldBindJSON(q); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := validatorGameName(game.GameName); err != nil {
+	if err := validatorGameName(q.GameName); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := mysql_server.MysqlService.Update(&game); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"message": "update success",
-	})
-}
-
-func DeleteApi(c *gin.Context) {
-	var game model.BaseInfo
-	if err := c.ShouldBindJSON(&game); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if err := validatorGameName(game.GameName); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if err := mysql_server.MysqlService.Delete(&game); err != nil {
+	if err := mysql_server.MysqlService.ClearTalkTime(q.GameName, q.TalkChannel); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"message": "delete success",
+		"message": "clear talk time channel success",
 	})
 }
 
