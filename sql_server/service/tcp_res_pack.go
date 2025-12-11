@@ -23,6 +23,8 @@ func handlePack(buf []byte) response.ResponseResult {
 		return update(buf)
 	case Query:
 		return query(buf)
+	case ClearTalkChannel:
+		return clearTalkChannel(buf)
 	}
 	return response.Fail(fmt.Sprintf("命令%d暂无", cmd))
 }
@@ -72,3 +74,13 @@ func query(buf []byte) response.ResponseResult {
 	}
 }
 
+func clearTalkChannel(buf []byte) response.ResponseResult {
+	q := &request.QueryReq{}
+	if err := json.Unmarshal(buf, q); err != nil {
+		return response.Fail(err.Error())
+	}
+	if err := mysql_server.MysqlService.ClearTalkTime(q.BaseInfo.GameName, q.TalkChannel); err != nil {
+		return response.Fail(err.Error())
+	}
+	return response.OK()
+}
