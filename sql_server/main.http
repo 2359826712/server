@@ -1,0 +1,49 @@
+### 每个新游戏建一张对应的表
+### game_name: 游戏名(表名, 全英文)
+POST http://192.168.2.99:9091/createNewGame
+Content-Type: application/json
+
+{
+  "game_name": "fsjs"
+}
+
+### 插入
+### game_name:游戏名(必填,即数据库的表名)
+### account: 角色名(必填)
+### b_zone, s_zone, rating: 大区, 小区, 等级
+POST http://192.168.2.99:9091/insert
+Content-Type: application/json
+
+{
+  "game_name": "fsjs",
+  "account": "1111123.com",
+  "b_zone": "b",
+  "s_zone": "s",
+  "rating": 10
+}
+
+### 查询
+### online_duration: 在线时长(单位分钟)
+### account, b_zone, s_zone, rating选填
+### cnt: 最多返回条数, 不填默认为1
+### talk_channel: 喊话通道(1~6)
+### 已查询到的对应项会自动刷新喊话通道对应的喊话时间为当前时间
+POST http://192.168.2.99:9091/query
+Content-Type: application/json
+
+{
+  "game_name": "fsjs",
+  "online_duration": 100000,
+  "b_zone": "b",
+  "cnt": 10,
+  "talk_channel": 1
+}
+
+### 清空喊话通道(即默认该喊话通道全部未喊话)
+POST http://192.168.2.99:9091/clearTalkChannel
+Content-Type: application/json
+
+{
+  "game_name": "fsjs",
+  "talk_channel": 1
+}
