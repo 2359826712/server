@@ -7,6 +7,7 @@
 // SZone    string `json:"s_zone"` //小区
 // Rating   int    `json:"rating"` //等级
 // OnlineDuration int `json:"online_duration"` // 在线时长, 单位分钟
+
 // TalkChannel    int `json:"talk_channel"` // 1-6
 ```
 ```http request
