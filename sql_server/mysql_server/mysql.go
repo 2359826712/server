@@ -52,14 +52,13 @@ func (m *mysqlService) Insert(base *model.BaseInfo) error {
 	lock.Lock()
 	defer lock.Unlock()
 	acc := &model.Account{
-		BaseInfo:   *base,
-		OnlineTime: time.Now(),
+		BaseInfo: *base,
 	}
 	var g = &model.Account{}
-	err := global.DB.Table(base.GameName).Where("account", base.Account).First(g).Error
+	err := global.DB.Table(base.GameName).Where("account = ?", base.Account).First(g).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return global.DB.Table(base.GameName).Create(acc).Error
-	} else if g.GameName != "" {
+	} else if err == nil {
 		return m.update(base)
 	} else {
 		return err
@@ -84,22 +83,26 @@ func (m *mysqlService) update(game *model.BaseInfo) error {
 	if game == nil {
 		return errors.New("数据为空")
 	}
-	db := global.DB.Table(game.GameName).Select("b_zone", "account", "s_zone", "rating", "online_time")
-	if game.BZone != "" {
-		db = db.Where("b_zone = ?", game.BZone)
-	}
-	if game.SZone != "" {
-		db = db.Where("s_zone = ?", game.SZone)
-	}
-	if game.Rating != 0 {
-		db = db.Where("rating = ?", game.Rating)
-	}
+	db := global.DB.Table(game.GameName).Select("status")
 	db = db.Where("account = ?", game.Account)
 	acc := &model.Account{
-		BaseInfo:   *game,
-		OnlineTime: time.Now(),
+		BaseInfo: *game,
 	}
 	return db.Updates(acc).Error
+}
+
+func (m *mysqlService) Delete(game *model.BaseInfo) error {
+	if game == nil {
+		return errors.New("数据为空")
+	}
+	if err := checkGameModel(game); err != nil {
+		return err
+	}
+	lock := m.locker.getLock(game.GameName)
+	lock.Lock()
+	defer lock.Unlock()
+	db := global.DB.Table(game.GameName).Where("account = ?", game.Account)
+	return db.Delete(&model.Account{}).Error
 }
 
 func (m *mysqlService) updateTalkTime(list []*model.BaseInfo, talkChannel string) error {
@@ -138,45 +141,36 @@ func (m *mysqlService) Query(query *request.QueryReq) (list []*model.BaseInfo, e
 		return nil, err
 	}
 	lock := m.locker.getLock(query.GameName)
-
 	lock.Lock()
 	defer lock.Unlock()
-
 	gm := query.BaseInfo
-	db := global.DB.Table(gm.GameName).Select("*")
-	now := time.Now()
-	// 默认至少一条
-	if query.Cnt == 0 {
-		query.Cnt = 1
-	}
-	if gm.Account != "" {
-		db = db.Where("account = ?", gm.Account)
-	}
-	if gm.BZone != "" {
-		db = db.Where("b_zone = ?", gm.BZone)
-	}
-	if gm.SZone != "" {
-		db = db.Where("s_zone = ?", gm.SZone)
-	}
-	if gm.Rating != 0 {
-		db = db.Where("rating = ?", gm.Rating)
-	}
-	if query.OnlineDuration != 0 {
-		db = db.Where("TIMESTAMPDIFF(MINUTE, online_time, ?) < ?", now, query.OnlineDuration)
-	}
-	talkChannel, err := getTalkChannel(query.TalkChannel)
-	if err != nil {
-		return nil, err
-	}
-	if query.TalkChannel != 0 {
-		db = db.Where(fmt.Sprintf("TIMESTAMPDIFF(MINUTE, %s, ?) > ?", talkChannel), now, query.OnlineDuration)
-	}
 	list = make([]*model.BaseInfo, 0)
-	if err = db.Limit(int(query.Cnt)).Find(&list).Error; err != nil {
-		return nil, err
-	}
-	if err = m.updateTalkTime(list, talkChannel); err != nil {
-		return nil, err
+	err = global.DB.Transaction(func(tx *gorm.DB) error {
+		db := tx.Table(gm.GameName).Select("*")
+		if gm.Account != "" {
+			db = db.Where("account = ?", gm.Account)
+		}
+		if gm.BZone != "" {
+			db = db.Where("b_zone = ?", gm.BZone)
+		}
+		if gm.SZone != "" {
+			db = db.Where("s_zone = ?", gm.SZone)
+		}
+		db = db.Where("status = ?", gm.Status)
+		db = db.Where("in_use = ?", gm.InUse)
+		var item model.BaseInfo
+		if e := db.Order("created_at ASC").Limit(1).Take(&item).Error; e != nil {
+			return e
+		}
+		if e := tx.Table(gm.GameName).Where("id = ?", item.ID).Update("in_use", true).Error; e != nil {
+			return e
+		}
+		item.InUse = true
+		list = append(list, &item)
+		return nil
+	})
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return list, nil
 	}
 	return list, err
 }
