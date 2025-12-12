@@ -7,4 +7,4 @@ mysql:
   path: 127.0.0.1
 service:
   tcp_port: 9090
-  http_port: 9096
+  http_port: 9097
