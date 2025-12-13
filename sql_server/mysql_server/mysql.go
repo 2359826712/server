@@ -3,12 +3,12 @@ package mysql_server
 import (
 	"errors"
 	"fmt"
-	"gorm.io/gorm"
 	"sql_server/global"
 	"sql_server/model"
 	"sql_server/model/request"
 	"sync"
 	"time"
+	"gorm.io/gorm"
 )
 
 var MysqlService = mysqlService{locker: &lockList{}}
@@ -51,6 +51,14 @@ func (m *mysqlService) Insert(base *model.BaseInfo) error {
 	lock := m.locker.getLock(base.GameName)
 	lock.Lock()
 	defer lock.Unlock()
+	// 确保旧表补齐新列
+	if err := model.AutoMigrate(base.GameName); err != nil {
+		return err
+	}
+	// 默认 in_use 为 "false"
+	if base.InUse == "" {
+		base.InUse = "false"
+	}
 	acc := &model.Account{
 		BaseInfo: *base,
 	}
@@ -76,6 +84,10 @@ func (m *mysqlService) Update(game *model.BaseInfo) error {
 	lock := m.locker.getLock(game.GameName)
 	lock.Lock()
 	defer lock.Unlock()
+	// 确保旧表补齐新列
+	if err := model.AutoMigrate(game.GameName); err != nil {
+		return err
+	}
 	return m.update(game)
 }
 
@@ -83,12 +95,21 @@ func (m *mysqlService) update(game *model.BaseInfo) error {
 	if game == nil {
 		return errors.New("数据为空")
 	}
-	db := global.DB.Table(game.GameName).Select("status")
-	db = db.Where("account = ?", game.Account)
-	acc := &model.Account{
-		BaseInfo: *game,
+	db := global.DB.Table(game.GameName).Where("account = ?", game.Account)
+	updates := map[string]interface{}{}
+	if game.Level != "" {
+		updates["level"] = game.Level
 	}
-	return db.Updates(acc).Error
+	if game.ComputerNumber != "" {
+		updates["computer_number"] = game.ComputerNumber
+	}
+	if game.Status != 0 {
+		updates["status"] = game.Status
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	return db.Updates(updates).Error
 }
 
 func (m *mysqlService) Delete(game *model.BaseInfo) error {
@@ -156,16 +177,22 @@ func (m *mysqlService) Query(query *request.QueryReq) (list []*model.BaseInfo, e
 		if gm.SZone != "" {
 			db = db.Where("s_zone = ?", gm.SZone)
 		}
-		db = db.Where("status = ?", gm.Status)
-		db = db.Where("in_use = ?", gm.InUse)
+		if gm.Level != "" {
+			db = db.Where("level = ?", gm.Level)
+		}
+		if gm.ComputerNumber != "" {
+			db = db.Where("computer_number = ?", gm.ComputerNumber)
+		}
+		if gm.InUse != "" {
+			db = db.Where("in_use = ?", gm.InUse)
+		}
+		if query.Status != 0 {
+			db = db.Where("status = ?", gm.Status)
+		}
 		var item model.BaseInfo
 		if e := db.Order("created_at ASC").Limit(1).Take(&item).Error; e != nil {
 			return e
 		}
-		if e := tx.Table(gm.GameName).Where("id = ?", item.ID).Update("in_use", true).Error; e != nil {
-			return e
-		}
-		item.InUse = true
 		list = append(list, &item)
 		return nil
 	})

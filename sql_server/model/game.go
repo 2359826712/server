@@ -15,7 +15,7 @@ type BaseInfo struct {
 	BZone          string `json:"b_zone"`
 	SZone          string `json:"s_zone"`
 	Status         int    `json:"status"`
-	InUse          bool   `json:"in_use"`
+	InUse          string `json:"in_use"`
 	Level          string `json:"level"`
 	ComputerNumber string `json:"computer_number"`
 }
@@ -36,7 +36,7 @@ func AutoMigrate(gameName string) error {
 	    b_zone VARCHAR(255),
 	    s_zone VARCHAR(255),
 	    status INT,
-	    in_use TINYINT(1) DEFAULT 0,
+	    in_use VARCHAR(5) NOT NULL DEFAULT 'false',
 	    level VARCHAR(255),
 	    computer_number VARCHAR(255));`, gameName)
 	if err := global.DB.Exec(createTableSQL).Error; err != nil {
@@ -61,6 +61,20 @@ func AutoMigrate(gameName string) error {
 			afterCol = "level"
 		}
 		if err := global.DB.Exec(fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN `computer_number` VARCHAR(255) AFTER `%s`", gameName, afterCol)).Error; err != nil {
+			return err
+		}
+	}
+	// ensure in_use column is VARCHAR(5) with 'false'/'true'
+	var inUseType string
+	if err := global.DB.Raw("SELECT DATA_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = 'in_use'", global.Config.Mysql.Dbname, gameName).Scan(&inUseType).Error; err != nil {
+		return err
+	}
+	if inUseType != "varchar" {
+		if err := global.DB.Exec(fmt.Sprintf("ALTER TABLE `%s` MODIFY COLUMN `in_use` VARCHAR(5) NOT NULL DEFAULT 'false'", gameName)).Error; err != nil {
+			return err
+		}
+		// convert existing values to 'true'/'false'
+		if err := global.DB.Exec(fmt.Sprintf("UPDATE `%s` SET `in_use` = CASE WHEN `in_use` IN ('1', 1, 'true') THEN 'true' ELSE 'false' END", gameName)).Error; err != nil {
 			return err
 		}
 	}
