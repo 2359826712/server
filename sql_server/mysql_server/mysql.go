@@ -106,6 +106,9 @@ func (m *mysqlService) update(game *model.BaseInfo) error {
 	if game.Status != 0 {
 		updates["status"] = game.Status
 	}
+	if game.InUse != "" {
+		updates["in_use"] = game.InUse
+	}
 	if len(updates) == 0 {
 		return nil
 	}
@@ -186,7 +189,7 @@ func (m *mysqlService) Query(query *request.QueryReq) (list []*model.BaseInfo, e
 		if gm.InUse != "" {
 			db = db.Where("in_use = ?", gm.InUse)
 		}
-		if query.Status != 0 {
+		if query.Status != 0 || query.Status == 0 {
 			db = db.Where("status = ?", gm.Status)
 		}
 		var item model.BaseInfo
