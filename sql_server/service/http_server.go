@@ -15,6 +15,7 @@ func StartHttpServer() {
 	router := gin.Default()
 	router.POST("/createNewGame", api.CreateNewGameApi)
 	router.POST("/insert", api.InsertApi)
+	router.POST("/update", api.UpdateApi)
 	router.POST("/query", api.QueryApi)
 
 	router.POST("/clearTalkChannel", api.ClearTalkChannelApi)

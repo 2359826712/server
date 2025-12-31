@@ -2,12 +2,13 @@ package api
 
 import (
 	"errors"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"sql_server/model"
 	"sql_server/model/request"
 	"sql_server/mysql_server"
 	"sql_server/utils"
+
+	"github.com/gin-gonic/gin"
 )
 
 func CreateNewGameApi(c *gin.Context) {
@@ -49,6 +50,25 @@ func InsertApi(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"message": "insert success",
+	})
+}
+
+func UpdateApi(c *gin.Context) {
+	var game model.BaseInfo
+	if err := c.ShouldBindJSON(&game); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := validatorGameName(game.GameName); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := mysql_server.MysqlService.Update(&game); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"message": "update success",
 	})
 }
 
