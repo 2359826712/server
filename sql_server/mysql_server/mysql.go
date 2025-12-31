@@ -3,6 +3,7 @@ package mysql_server
 import (
 	"errors"
 	"fmt"
+	"gorm.io/gorm/clause"
 	"gorm.io/gorm"
 	"sql_server/global"
 	"sql_server/model"
@@ -37,23 +38,13 @@ func (m *mysqlService) Insert(base *model.BaseInfo) error {
 		OnlineTime: time.Now(),
 	}
 
-	// Use transaction to ensure atomicity
 	return global.DB.Transaction(func(tx *gorm.DB) error {
-		var g = &model.Account{}
-		err := tx.Table(base.GameName).Where("account = ?", base.Account).First(g).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return tx.Table(base.GameName).Create(acc).Error
-		} else if err != nil {
-			return err
-		}
-
-		// Update if exists
-		db := tx.Table(base.GameName).Where("account = ?", base.Account)
-		accUpdate := &model.Account{
-			BaseInfo:   *base,
-			OnlineTime: time.Now(),
-		}
-		return db.Select("b_zone", "s_zone", "rating", "online_time").Updates(accUpdate).Error
+		return tx.Table(base.GameName).
+			Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "account"}},
+				DoUpdates: clause.AssignmentColumns([]string{"b_zone", "s_zone", "rating", "online_time"}),
+			}).
+			Create(acc).Error
 	})
 }
 
@@ -146,9 +137,7 @@ func (m *mysqlService) Query(query *request.QueryReq) (list []*model.BaseInfo, e
 	if err = db.Limit(int(query.Cnt)).Find(&list).Error; err != nil {
 		return nil, err
 	}
-	if err = m.updateTalkTime(list, talkChannel); err != nil {
-		return nil, err
-	}
+	enqueueTalkUpdate(list, talkChannel)
 	return list, err
 }
 

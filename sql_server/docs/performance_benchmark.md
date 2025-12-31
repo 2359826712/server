@@ -1,40 +1,40 @@
-# Performance Benchmark Report
+# 性能基准报告
 
-## 1. Test Environment
-- **Server Configuration**: Windows Environment (Dev), configured with Go 1.23.
-- **Database**: MySQL (GORM driver).
-- **Client Simulation**: 500 concurrent connections, 50 requests per connection (Total 25,000 requests).
-- **Mix**: 50% Query, 50% Insert.
+## 1. 测试环境
+- **服务器配置**：Windows 开发环境，Go 1.23。
+- **数据库**：MySQL（GORM 驱动）。
+- **客户端模拟**：500 并发连接，每个连接 50 次请求（总计 25,000 次）。
+- **负载组合**：查询 50%，插入 50%。
 
-## 2. Optimization Strategy Implemented
-1.  **Goroutine Pool**: Replaced per-connection serial processing with a worker pool (100 workers).
-    -   *Benefit*: Limits concurrent DB connections, prevents resource exhaustion, allows parallel processing of requests from the same connection (pipelining).
-2.  **Priority Queues**:
-    -   **High Priority**: Query operations.
-    -   **Normal Priority**: Insert/Update operations.
-    -   *Benefit*: Ensures read operations (95% target < 100ms) are processed first even under write load.
-3.  **Connection Pooling**:
-    -   Configured GORM `MaxOpenConns` (100) and `MaxIdleConns` (10).
-    -   *Benefit*: Removes handshake overhead, reuses connections.
-4.  **Lock Removal**:
-    -   Removed global application-level `sync.Mutex` per game.
-    -   Replaced with Database Transactions and row-level locking.
-    -   *Benefit*: Massive concurrency improvement. Previously, all requests for "GameA" were serial. Now, they are parallel (limited only by DB row locks).
+## 2. 已实施的优化策略
+1.  **协程池**：用包含 100 个 worker 的工作池替代按连接的串行处理。
+    -   益处：限制并发数据库连接，防止资源耗尽，允许同一连接请求的并行流水处理。
+2.  **优先级队列**：
+    -   **高优先级**：查询操作。
+    -   **普通优先级**：插入/更新操作。
+    -   益处：在写入压力下仍优先处理读取（95% 目标 < 100ms）。
+3.  **连接池**：
+    -   配置 GORM `MaxOpenConns`（100）和 `MaxIdleConns`（10）。
+    -   益处：减少握手开销，复用连接。
+4.  **移除全局锁**：
+    -   移除按游戏维度的应用级 `sync.Mutex`。
+    -   以数据库事务与行级锁替代。
+    -   益处：并发性显著提升。此前 “GameA” 的所有请求为串行，现在可并行（仅受数据库行锁限制）。
 
-## 3. Expected Performance Results
-Based on the architecture changes:
+## 3. 预期性能结果
+基于上述架构调整：
 
-| Metric | Before Optimization | After Optimization | Target |
+| 指标 | 优化前 | 优化后 | 目标 |
 | :--- | :--- | :--- | :--- |
-| **Concurrency** | Serial per Game | Parallel (Worker Pool) | > 10,000 Conn |
-| **Query Latency (P95)** | High (blocked by writes) | < 50ms | < 100ms |
-| **Throughput (QPS)** | Low (< 100) | > 2000 | > 1000 |
-| **CPU Usage** | Low (Lock contention) | High (Efficient utilization) | Stable |
+| **并发性** | 按游戏串行 | 并行（工作池） | > 10,000 连接 |
+| **查询延迟（P95）** | 高（被写阻塞） | < 50ms | < 100ms |
+| **吞吐（QPS）** | 低（< 100） | > 2000 | > 1000 |
+| **CPU 使用率** | 低（锁竞争） | 高（高效利用） | 稳定 |
 
-## 4. Stress Test Script
-A stress test script `stress_test.go` has been provided in the root directory.
-To run it:
+## 4. 压测脚本
+根目录提供了压测脚本 `stress_test.go`。
+运行方式：
 ```bash
 go test -v -run TestPerformance
 ```
-This script simulates 200 concurrent clients sending mixed workloads and measures P95 latency and QPS.
+该脚本模拟 200 个并发客户端发送混合负载，并测量 P95 延迟与 QPS。

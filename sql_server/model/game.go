@@ -44,7 +44,11 @@ func AutoMigrate(gameName string) error {
     last_talk_time3 DATETIME DEFAULT '2000-01-01 00:00:00',                               
     last_talk_time4 DATETIME DEFAULT '2000-01-01 00:00:00',                               
     last_talk_time5 DATETIME DEFAULT '2000-01-01 00:00:00',                                
-    last_talk_time6 DATETIME DEFAULT '2000-01-01 00:00:00');`, gameName)
+    last_talk_time6 DATETIME DEFAULT '2000-01-01 00:00:00',
+    UNIQUE KEY idx_account (account),
+    KEY idx_zone_rating (b_zone, s_zone, rating),
+    KEY idx_online_time (online_time)
+    );`, gameName)
 	if err := global.DB.Exec(createTableSQL).Error; err != nil {
 		return fmt.Errorf("Failed to create table %s: %v", gameName, err)
 	}
