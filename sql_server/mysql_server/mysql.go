@@ -3,17 +3,30 @@ package mysql_server
 import (
 	"errors"
 	"fmt"
-	"gorm.io/gorm/clause"
 	"gorm.io/gorm"
 	"sql_server/global"
 	"sql_server/model"
 	"sql_server/model/request"
+	"sync"
 	"time"
 )
 
-var MysqlService = mysqlService{}
+var MysqlService = mysqlService{locker: &lockList{}}
+
+type lockList struct {
+	locks sync.Map
+}
+
+func (l *lockList) getLock(gameName string) *sync.Mutex {
+	lock, loaded := l.locks.LoadOrStore(gameName, new(sync.Mutex))
+	if !loaded {
+		return lock.(*sync.Mutex)
+	}
+	return lock.(*sync.Mutex)
+}
 
 type mysqlService struct {
+	locker *lockList
 }
 
 // 创建表
@@ -21,6 +34,9 @@ func (m *mysqlService) NewGame(gameName string) error {
 	if gameName == "" {
 		return errors.New("游戏名为空")
 	}
+	lock := m.locker.getLock(gameName)
+	lock.Lock()
+	defer lock.Unlock()
 	return model.AutoMigrate(gameName)
 }
 
@@ -32,20 +48,22 @@ func (m *mysqlService) Insert(base *model.BaseInfo) error {
 	if err := checkGameModel(base); err != nil {
 		return err
 	}
-
+	lock := m.locker.getLock(base.GameName)
+	lock.Lock()
+	defer lock.Unlock()
 	acc := &model.Account{
 		BaseInfo:   *base,
 		OnlineTime: time.Now(),
 	}
-
-	return global.DB.Transaction(func(tx *gorm.DB) error {
-		return tx.Table(base.GameName).
-			Clauses(clause.OnConflict{
-				Columns:   []clause.Column{{Name: "account"}},
-				DoUpdates: clause.AssignmentColumns([]string{"b_zone", "s_zone", "rating", "online_time"}),
-			}).
-			Create(acc).Error
-	})
+	var g = &model.Account{}
+	err := global.DB.Table(base.GameName).Where("account", base.Account).First(g).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return global.DB.Table(base.GameName).Create(acc).Error
+	} else if g.GameName != "" {
+		return m.update(base)
+	} else {
+		return err
+	}
 }
 
 // 即再次采集
@@ -56,6 +74,9 @@ func (m *mysqlService) Update(game *model.BaseInfo) error {
 	if err := checkGameModel(game); err != nil {
 		return err
 	}
+	lock := m.locker.getLock(game.GameName)
+	lock.Lock()
+	defer lock.Unlock()
 	return m.update(game)
 }
 
@@ -88,7 +109,10 @@ func (m *mysqlService) ClearTalkTime(gameName string, talkChannel uint) error {
 	if err := checkGameName(gameName); err != nil {
 		return err
 	}
+	lock := m.locker.getLock(gameName)
 
+	lock.Lock()
+	defer lock.Unlock()
 	field, err := getTalkChannel(talkChannel)
 	if err != nil {
 		return err
@@ -103,6 +127,10 @@ func (m *mysqlService) Query(query *request.QueryReq) (list []*model.BaseInfo, e
 	if err = checkGameName(query.GameName); err != nil {
 		return nil, err
 	}
+	lock := m.locker.getLock(query.GameName)
+
+	lock.Lock()
+	defer lock.Unlock()
 
 	gm := query.BaseInfo
 	db := global.DB.Table(gm.GameName).Select("*")
@@ -137,7 +165,9 @@ func (m *mysqlService) Query(query *request.QueryReq) (list []*model.BaseInfo, e
 	if err = db.Limit(int(query.Cnt)).Find(&list).Error; err != nil {
 		return nil, err
 	}
-	enqueueTalkUpdate(list, talkChannel)
+	if err = m.updateTalkTime(list, talkChannel); err != nil {
+		return nil, err
+	}
 	return list, err
 }
 

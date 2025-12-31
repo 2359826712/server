@@ -4,7 +4,6 @@ import (
 	"sql_server/global"
 	"sql_server/initialize"
 	"sql_server/service"
-	"sql_server/mysql_server"
 )
 
 func main() {
@@ -14,7 +13,7 @@ func main() {
 		db, _ := global.DB.DB()
 		defer db.Close()
 	}
-	mysql_server.StartTalkUpdater(4)
-	go service.StartTcpServer()
+	//service.StartTcpServer()
 	service.StartHttpServer()
+
 }
