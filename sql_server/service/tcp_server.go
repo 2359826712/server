@@ -11,7 +11,8 @@ import (
 	"sql_server/service/pool"
 )
 
-var WorkerPool *pool.WorkerPool
+var QueryPool *pool.WorkerPool
+var WritePool *pool.WorkerPool
 
 // 服务端
 // 收包形式
@@ -20,13 +21,16 @@ var WorkerPool *pool.WorkerPool
 // 内容: json数据
 
 func StartTcpServer() {
-	// Initialize WorkerPool
-	// 100 workers, 10000 queue size
-	WorkerPool = pool.NewWorkerPool(100, 10000, func(data []byte) ([]byte, error) {
+	QueryPool = pool.NewWorkerPool(200, 20000, func(data []byte) ([]byte, error) {
 		return handlePack(data), nil
 	})
-	WorkerPool.Start()
-	defer WorkerPool.Stop()
+	WritePool = pool.NewWorkerPool(50, 10000, func(data []byte) ([]byte, error) {
+		return handlePack(data), nil
+	})
+	QueryPool.Start()
+	WritePool.Start()
+	defer QueryPool.Stop()
+	defer WritePool.Stop()
 
 	// 监听指定的端口
 	listener, er := net.Listen("tcp", fmt.Sprintf(":%d", global.Config.Service.TcpPort))
@@ -121,7 +125,11 @@ func handleConnection(conn net.Conn) {
 				Type:   jobType,
 				Result: responses,
 			}
-			WorkerPool.Submit(job)
+			if jobType == pool.JobTypeQuery {
+				QueryPool.Submit(job)
+			} else {
+				WritePool.Submit(job)
+			}
 		}
 	}
 }
