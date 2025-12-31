@@ -4,7 +4,6 @@ go 1.23
 
 require (
 	github.com/fsnotify/fsnotify v1.7.0
-	github.com/fvbock/endless v0.0.0-20170109170031-447134032cb6
 	github.com/gin-gonic/gin v1.10.0
 	github.com/spf13/viper v1.19.0
 	gorm.io/driver/mysql v1.5.7
