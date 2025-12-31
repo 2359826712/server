@@ -7,7 +7,6 @@ import (
 	"gorm.io/gorm"
 	"log"
 	"sql_server/config"
-	"time"
 )
 
 func InitGormDb(ms config.Mysql) *gorm.DB {
@@ -29,27 +28,6 @@ func InitGormDb(ms config.Mysql) *gorm.DB {
 	db, err := gorm.Open(mysql.New(mysqlConfig))
 	if err != nil {
 		panic(err)
-	}
-	sqlDB, _ := db.DB()
-	// SetMaxIdleConns 设置空闲连接池中连接的最大数量
-	if ms.MaxIdleConns > 0 {
-		sqlDB.SetMaxIdleConns(ms.MaxIdleConns)
-	} else {
-		sqlDB.SetMaxIdleConns(10)
-	}
-
-	// SetMaxOpenConns 设置打开数据库连接的最大数量
-	if ms.MaxOpenConns > 0 {
-		sqlDB.SetMaxOpenConns(ms.MaxOpenConns)
-	} else {
-		sqlDB.SetMaxOpenConns(100)
-	}
-
-	// SetConnMaxLifetime 设置了连接可复用的最大时间
-	if ms.ConnMaxLifetime > 0 {
-		sqlDB.SetConnMaxLifetime(time.Duration(ms.ConnMaxLifetime) * time.Second)
-	} else {
-		sqlDB.SetConnMaxLifetime(time.Hour)
 	}
 	return db
 }
