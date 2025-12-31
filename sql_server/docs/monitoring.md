@@ -1,34 +1,34 @@
-# System Monitoring Guide
+# 系统监控指南
 
-## 1. Key Metrics to Monitor
+## 1. 关键监控指标
 
-### System Metrics
-- **CPU Usage**: High usage is expected under load, but should not stay at 100% continuously.
-- **Memory Usage**: Monitor for leaks. The worker pool limits concurrency, so memory should be stable.
-- **Network I/O**: Throughput (MB/s) and Packet rate.
+### 系统指标
+- **CPU 使用率**：在负载下预期较高，但不应持续保持 100%。
+- **内存使用**：关注泄漏。工作池限制并发，内存应保持稳定。
+- **网络 I/O**：吞吐（MB/s）与包速率。
 
-### Application Metrics (To be implemented via Prometheus/Log parsing)
-- **Worker Pool Depth**:
-    -   `HighPriorityQueue` Length
-    -   `NormalPriorityQueue` Length
-    -   *Alert*: If queue is full (blocking), scale up workers.
-- **Latency**:
-    -   P95 Response Time.
-    -   *Target*: < 100ms for Queries.
-- **Throughput (QPS)**:
-    -   Requests per second.
-- **Error Rate**:
-    -   DB Connection Errors.
-    -   JSON Parse Errors.
+### 应用指标（可通过 Prometheus/日志解析实现）
+- **工作池深度**：
+    -   `HighPriorityQueue` 长度
+    -   `NormalPriorityQueue` 长度
+    -   告警：若队列已满（阻塞），需扩容 worker。
+- **延迟**：
+    -   P95 响应时间。
+    -   目标：查询 < 100ms。
+- **吞吐（QPS）**：
+    -   每秒请求数。
+- **错误率**：
+    -   数据库连接错误。
+    -   JSON 解析错误。
 
-## 2. Logging
-- **Standard Output**: The server logs important events (New Connection, Errors) to stdout.
-- **Log Rotation**: Ensure stdout is captured and rotated (e.g., via Docker logs or logrotate).
+## 2. 日志
+- **标准输出**：服务器将重要事件（新连接、错误）输出到 stdout。
+- **日志轮转**：确保 stdout 被采集并进行轮转（例如通过 Docker logs 或 logrotate）。
 
-## 3. Health Check
-- **TCP Port Check**: Monitor if port 9090 is accepting connections.
-- **HTTP Health Endpoint** (Optional): The server starts an HTTP server on port 9091. You can add a `/health` endpoint to `service/http_server.go` for load balancers.
+## 3. 健康检查
+- **TCP 端口检查**：监控 9090 端口是否接受连接。
+- **HTTP 健康端点**（可选）：服务器在 9091 端口启动 HTTP 服务。可在 `service/http_server.go` 中添加 `/health` 端点以供负载均衡器使用。
 
-## 4. Database Monitoring
-- **Connections**: Monitor active vs idle connections. (Max configured: 100).
-- **Slow Queries**: Enable MySQL slow query log to identify unoptimized SQL.
+## 4. 数据库监控
+- **连接数**：监控活跃与空闲连接（最大配置：100）。
+- **慢查询**：启用 MySQL 慢查询日志以定位未优化的 SQL。
