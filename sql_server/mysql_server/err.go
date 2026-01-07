@@ -8,6 +8,7 @@ import (
 var (
 	NoGameNameErr = errors.New("游戏名不能为空")
 	NoAccountErr  = errors.New("账号名不能为空")
+	QueryToEndErr = errors.New("查询计数已到末尾")
 )
 
 func checkGameModel(game *model.BaseInfo) error {

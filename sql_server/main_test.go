@@ -1,7 +1,11 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"sql_server/model"
 	"sql_server/model/request"
 	"sql_server/service"
@@ -39,4 +43,39 @@ func TestClient(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(10 * time.Second)
+}
+
+func TestHttpQuery(t *testing.T) {
+	for i := 0; i < 3000; i++ {
+		go testQuery(i)
+	}
+	time.Sleep(time.Minute)
+}
+
+func testQuery(index int) {
+	//fmt.Println("开始请求", index)
+	url := "http://192.168.20.66:9096/query_no_update"
+	q := &request.QueryReq{
+		Cnt: 10,
+		BaseInfo: model.BaseInfo{
+			GameName: "arc_game",
+		},
+	}
+	b, _ := json.Marshal(q)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
+	if err != nil {
+		panic(fmt.Errorf("req err: %v", err))
+	}
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		panic(fmt.Errorf("client err: %v", err))
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		panic(fmt.Errorf("read body err: %v", err))
+	}
+	fmt.Println(index, "--->>", string(data))
 }
