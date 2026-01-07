@@ -2,12 +2,13 @@ package service
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
 	"sql_server/api"
 	"sql_server/global"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 func StartHttpServer() {
@@ -17,6 +18,8 @@ func StartHttpServer() {
 	router.POST("/insert", api.InsertApi)
 	router.POST("/update", api.UpdateApi)
 	router.POST("/query", api.QueryApi)
+	router.POST("/query_no_update", api.QueryNoUpdateApi)
+	router.POST("/resetQueryCounter", api.ResetQueryCounterApi)
 
 	router.POST("/clearTalkChannel", api.ClearTalkChannelApi)
 	// 启动 HTTP 服务器
