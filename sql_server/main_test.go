@@ -46,14 +46,17 @@ func TestClient(t *testing.T) {
 }
 
 func TestHttpQuery(t *testing.T) {
+	client := http.Client{}
+	do := client.Do
 	for i := 0; i < 3000; i++ {
-		go testQuery(i)
+		testQuery(i, do)
 	}
 	time.Sleep(time.Minute)
 }
 
-func testQuery(index int) {
+func testQuery(index int, do func(req *http.Request) (*http.Response, error)) {
 	//fmt.Println("开始请求", index)
+	start := time.Now()
 	url := "http://192.168.20.66:9096/query_no_update"
 	q := &request.QueryReq{
 		Cnt: 10,
@@ -67,8 +70,7 @@ func testQuery(index int) {
 		panic(fmt.Errorf("req err: %v", err))
 	}
 	req.Header.Set("Content-Type", "application/json")
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := do(req)
 	if err != nil {
 		panic(fmt.Errorf("client err: %v", err))
 	}
@@ -77,5 +79,5 @@ func testQuery(index int) {
 	if err != nil {
 		panic(fmt.Errorf("read body err: %v", err))
 	}
-	fmt.Println(index, "--->>", string(data))
+	fmt.Println("用时： ", time.Since(start).Milliseconds(), "ms ", index, "--->>", string(data))
 }
