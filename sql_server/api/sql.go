@@ -96,6 +96,47 @@ func QueryApi(c *gin.Context) {
 	}
 }
 
+func QueryNoUpdateApi(c *gin.Context) {
+	var q request.QueryReq
+	if err := c.ShouldBindJSON(&q); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := validatorGameName(q.GameName); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if list, err := mysql_server.MysqlService.QueryNoUpdate(&q); err != nil {
+		if errors.Is(err, mysql_server.QueryToEndErr) {
+			// 双方约定， 401表示计数到最大值
+			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "query success",
+			"data":    list,
+		})
+	}
+}
+
+func ResetQueryCounterApi(c *gin.Context) {
+	var q request.QueryReq
+	if err := c.ShouldBindJSON(&q); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := validatorGameName(q.GameName); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	mysql_server.MysqlService.ResetQueryCounter(q.GameName)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "reset query counter success",
+	})
+}
+
 func ClearTalkChannelApi(c *gin.Context) {
 	var q = &request.QueryReq{}
 	if err := c.ShouldBindJSON(q); err != nil {

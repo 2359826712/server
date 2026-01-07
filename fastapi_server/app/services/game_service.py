@@ -168,14 +168,23 @@ def query_game(db: Session, query: QueryReq):
     
     # Transaction for Read + Update
     # We want to return the list AND update their talk time.
-    # Ideally, this should be atomic, but for high performance, 
-    # we can do Read then Update. 
-    # If we use FOR UPDATE, it blocks. 
-    # Given the requirement "avoid lag", we should avoid long locks.
-    # Standard Select -> Update by ID is fine.
+    # Using FOR UPDATE SKIP LOCKED ensures that:
+    # 1. We lock the rows we select, preventing other clients from selecting them (Avoid Double Booking).
+    # 2. We skip rows locked by others, preventing waiting/blocking (Avoid Lag/Timeouts).
     
-    full_sql = " ".join(sql_parts)
-    result = db.execute(text(full_sql), params).fetchall()
+    full_sql = " ".join(sql_parts) + " FOR UPDATE SKIP LOCKED"
+    
+    try:
+        result = db.execute(text(full_sql), params).fetchall()
+    except Exception as e:
+        # Fallback for older MySQL versions (e.g. 5.7) that don't support SKIP LOCKED
+        # If syntax error, try standard FOR UPDATE (which might block, but ensures consistency)
+        if "syntax" in str(e).lower() or "1064" in str(e):
+            print("Warning: SKIP LOCKED not supported, falling back to FOR UPDATE")
+            full_sql = " ".join(sql_parts) + " FOR UPDATE"
+            result = db.execute(text(full_sql), params).fetchall()
+        else:
+            raise e
     
     # Update talk time for these records
     if result and talk_channel_field:

@@ -3,12 +3,13 @@ package mysql_server
 import (
 	"errors"
 	"fmt"
-	"gorm.io/gorm"
 	"sql_server/global"
 	"sql_server/model"
 	"sql_server/model/request"
 	"sync"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 var MysqlService = mysqlService{locker: &lockList{}}
@@ -26,7 +27,8 @@ func (l *lockList) getLock(gameName string) *sync.Mutex {
 }
 
 type mysqlService struct {
-	locker *lockList
+	locker   *lockList
+	indexMap sync.Map
 }
 
 // 创建表
@@ -120,6 +122,10 @@ func (m *mysqlService) ClearTalkTime(gameName string, talkChannel uint) error {
 	return global.DB.Table(gameName).Where("id >= 0").Update(field, "2000-01-01 00:00:00").Error
 }
 
+func (m *mysqlService) ResetQueryCounter(gameName string) {
+	m.indexMap.Delete(gameName)
+}
+
 func (m *mysqlService) Query(query *request.QueryReq) (list []*model.BaseInfo, err error) {
 	if query == nil {
 		return nil, errors.New("查询数据为空")
@@ -162,10 +168,44 @@ func (m *mysqlService) Query(query *request.QueryReq) (list []*model.BaseInfo, e
 		db = db.Where(fmt.Sprintf("TIMESTAMPDIFF(MINUTE, %s, ?) > ?", talkChannel), now, query.OnlineDuration)
 	}
 	list = make([]*model.BaseInfo, 0)
-	if err = db.Limit(int(query.Cnt)).Find(&list).Error; err != nil {
+	if err = db.Limit(int(query.Cnt)).Where("game_name = ?", query.GameName).Find(&list).Error; err != nil {
 		return nil, err
 	}
 	if err = m.updateTalkTime(list, talkChannel); err != nil {
+		return nil, err
+	}
+	return list, err
+}
+
+func (m *mysqlService) QueryNoUpdate(query *request.QueryReq) (list []*model.BaseInfo, err error) {
+	if query == nil {
+		return nil, errors.New("查询数据为空")
+	}
+	if err = checkGameName(query.GameName); err != nil {
+		return nil, err
+	}
+	lock := m.locker.getLock(query.GameName)
+	lock.Lock()
+	var total, index int64
+	global.DB.Table(query.GameName).Count(&total)
+	val, ok := m.indexMap.Load(query.GameName)
+	if ok {
+		index = val.(int64)
+	}
+	if total <= index {
+		lock.Unlock()
+		return nil, QueryToEndErr
+	}
+	m.indexMap.Store(query.GameName, index+int64(query.Cnt))
+	lock.Unlock()
+	gm := query.BaseInfo
+	db := global.DB.Table(gm.GameName).Select("*")
+	// 默认至少一条
+	if query.Cnt == 0 {
+		query.Cnt = 1
+	}
+	list = make([]*model.BaseInfo, 0)
+	if err = db.Limit(int(query.Cnt)).Where("game_name = ? and id > ?", query.GameName, index).Find(&list).Error; err != nil {
 		return nil, err
 	}
 	return list, err
