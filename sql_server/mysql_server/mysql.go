@@ -185,16 +185,13 @@ func (m *mysqlService) QueryNoUpdate(query *request.QueryReq) (list []*model.Bas
 		return nil, err
 	}
 	lock := m.locker.getLock(query.GameName)
+
+	// 先计数
 	lock.Lock()
-	var total, index int64
-	global.DB.Table(query.GameName).Count(&total)
+	var index int64
 	val, ok := m.indexMap.Load(query.GameName)
 	if ok {
 		index = val.(int64)
-	}
-	if total <= index {
-		lock.Unlock()
-		return nil, QueryToEndErr
 	}
 	m.indexMap.Store(query.GameName, index+int64(query.Cnt))
 	lock.Unlock()
@@ -208,6 +205,10 @@ func (m *mysqlService) QueryNoUpdate(query *request.QueryReq) (list []*model.Bas
 	if err = db.Limit(int(query.Cnt)).Where("game_name = ? and id > ?", query.GameName, index).Find(&list).Error; err != nil {
 		return nil, err
 	}
+	if len(list) == 0 {
+		return nil, QueryToEndErr
+	}
+
 	return list, err
 }
 
