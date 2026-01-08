@@ -122,7 +122,16 @@ func (m *mysqlService) ClearTalkTime(gameName string, talkChannel uint) error {
 }
 
 func (m *mysqlService) ResetQueryCounter(gameName string) error {
-	return global.DB.Table("counters").Where("game_name = ?", gameName).Update("counter", 0).Error
+	var total int64
+	if err := global.DB.Table(gameName).Count(&total).Error; err != nil {
+		return err
+	}
+	return global.DB.Table("counters_esc").Where("game_name = ?", gameName).Updates(
+		map[string]interface{}{
+			"counter":      0,
+			"desc_counter": total,
+		},
+	).Error
 }
 
 func (m *mysqlService) Query(query *request.QueryReq) (list []*model.BaseInfo, err error) {
@@ -184,23 +193,28 @@ func (m *mysqlService) QueryNoUpdate(query *request.QueryReq) (list []*model.Bas
 		return nil, err
 	}
 	lock := m.locker.getLock(query.GameName + "counter")
-
 	// 先计数
 	lock.Lock()
 	var cter = model.Counter{
 		GameName: query.GameName,
 	}
-	if err = global.DB.Table("counters").Where("game_name = ?", query.GameName).FirstOrCreate(&cter).Error; err != nil {
+	err = global.DB.Table("counters_esc").Where("game_name = ?", query.GameName).FirstOrCreate(&cter).Error
+	if err != nil {
+		lock.Unlock()
 		return nil, err
 	}
-	sign := int64(1)
+	if cter.DescCounter == 0 {
+		global.DB.Table(query.GameName).Count(&cter.DescCounter)
+	}
 	if query.IsDesc {
-		sign = -1
-	}
-	if err = global.DB.Table("counters").Where("game_name = ?", query.GameName).Update("counter", cter.Counter+int64(query.Cnt)*sign).Error; err != nil {
-		return nil, err
+		err = global.DB.Table("counters_esc").Where("game_name = ?", query.GameName).Update("desc_counter", cter.DescCounter-int64(query.Cnt)).Error
+	} else {
+		err = global.DB.Table("counters_esc").Where("game_name = ?", query.GameName).Update("counter", cter.Counter+int64(query.Cnt)).Error
 	}
 	lock.Unlock()
+	if err != nil {
+		return nil, err
+	}
 	gm := query.BaseInfo
 	db := global.DB.Table(gm.GameName).Select("*")
 	// 默认至少一条
@@ -209,7 +223,10 @@ func (m *mysqlService) QueryNoUpdate(query *request.QueryReq) (list []*model.Bas
 	}
 	list = make([]*model.BaseInfo, 0)
 	if query.IsDesc {
-		if err = db.Limit(int(query.Cnt)).Where("game_name = ? and id < ?", query.GameName, cter.Counter).Find(&list).Error; err != nil {
+		if cter.DescCounter-int64(query.Cnt) < 0 {
+			return nil, QueryToEndErr
+		}
+		if err = db.Limit(int(query.Cnt)).Where("game_name = ? and id < ? and id >= ?", query.GameName, cter.DescCounter, cter.DescCounter-int64(query.Cnt)).Find(&list).Error; err != nil {
 			return nil, err
 		}
 	} else {
