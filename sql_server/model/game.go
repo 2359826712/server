@@ -28,6 +28,12 @@ type Account struct {
 	LastTalkTime6 time.Time `json:"last_talk_time6" gorm:"default:'2000-01-01 00:00:00'"` //最后喊话时间6
 }
 
+type Counter struct {
+	ID       int    `json:"ID" gorm:"primaryKey"`
+	GameName string `json:"game_name"`
+	Counter  int64  `json:"counter"`
+}
+
 // D2迁移到数据库
 func AutoMigrate(gameName string) error {
 	createTableSQL := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS `+`%s`+`(
@@ -47,6 +53,14 @@ func AutoMigrate(gameName string) error {
     last_talk_time6 DATETIME DEFAULT '2000-01-01 00:00:00');`, gameName)
 	if err := global.DB.Exec(createTableSQL).Error; err != nil {
 		return fmt.Errorf("Failed to create table %s: %v", gameName, err)
+	}
+	return nil
+}
+
+func AutoMigrateCounters() error {
+	createTableSql := `CREATE TABLE IF NOT EXISTS counters (id INT PRIMARY KEY AUTO_INCREMENT,game_name VARCHAR(255),counter INT)`
+	if err := global.DB.Exec(createTableSql).Error; err != nil {
+		return fmt.Errorf("Failed to create table counters: %v", err)
 	}
 	return nil
 }

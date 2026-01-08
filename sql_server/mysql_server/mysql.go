@@ -27,8 +27,7 @@ func (l *lockList) getLock(gameName string) *sync.Mutex {
 }
 
 type mysqlService struct {
-	locker   *lockList
-	indexMap sync.Map
+	locker *lockList
 }
 
 // 创建表
@@ -122,8 +121,8 @@ func (m *mysqlService) ClearTalkTime(gameName string, talkChannel uint) error {
 	return global.DB.Table(gameName).Where("id >= 0").Update(field, "2000-01-01 00:00:00").Error
 }
 
-func (m *mysqlService) ResetQueryCounter(gameName string) {
-	m.indexMap.Delete(gameName)
+func (m *mysqlService) ResetQueryCounter(gameName string) error {
+	return global.DB.Table("counters").Where("game_name = ?", gameName).Update("counter", 0).Error
 }
 
 func (m *mysqlService) Query(query *request.QueryReq) (list []*model.BaseInfo, err error) {
@@ -184,16 +183,23 @@ func (m *mysqlService) QueryNoUpdate(query *request.QueryReq) (list []*model.Bas
 	if err = checkGameName(query.GameName); err != nil {
 		return nil, err
 	}
-	lock := m.locker.getLock(query.GameName)
+	lock := m.locker.getLock(query.GameName + "counter")
 
 	// 先计数
 	lock.Lock()
-	var index int64
-	val, ok := m.indexMap.Load(query.GameName)
-	if ok {
-		index = val.(int64)
+	var cter = model.Counter{
+		GameName: query.GameName,
 	}
-	m.indexMap.Store(query.GameName, index+int64(query.Cnt))
+	if err = global.DB.Table("counters").Where("game_name = ?", query.GameName).FirstOrCreate(&cter).Error; err != nil {
+		return nil, err
+	}
+	sign := int64(1)
+	if query.IsDesc {
+		sign = -1
+	}
+	if err = global.DB.Table("counters").Where("game_name = ?", query.GameName).Update("counter", cter.Counter+int64(query.Cnt)*sign).Error; err != nil {
+		return nil, err
+	}
 	lock.Unlock()
 	gm := query.BaseInfo
 	db := global.DB.Table(gm.GameName).Select("*")
@@ -202,8 +208,14 @@ func (m *mysqlService) QueryNoUpdate(query *request.QueryReq) (list []*model.Bas
 		query.Cnt = 1
 	}
 	list = make([]*model.BaseInfo, 0)
-	if err = db.Limit(int(query.Cnt)).Where("game_name = ? and id > ?", query.GameName, index).Find(&list).Error; err != nil {
-		return nil, err
+	if query.IsDesc {
+		if err = db.Limit(int(query.Cnt)).Where("game_name = ? and id < ?", query.GameName, cter.Counter).Find(&list).Error; err != nil {
+			return nil, err
+		}
+	} else {
+		if err = db.Limit(int(query.Cnt)).Where("game_name = ? and id > ?", query.GameName, cter.Counter).Find(&list).Error; err != nil {
+			return nil, err
+		}
 	}
 	if len(list) == 0 {
 		return nil, QueryToEndErr
