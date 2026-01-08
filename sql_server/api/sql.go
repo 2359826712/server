@@ -131,7 +131,10 @@ func ResetQueryCounterApi(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	mysql_server.MysqlService.ResetQueryCounter(q.GameName)
+	if err := mysql_server.MysqlService.ResetQueryCounter(q.GameName); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"message": "reset query counter success",
 	})
