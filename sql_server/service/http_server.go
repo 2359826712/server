@@ -28,7 +28,7 @@ func StartHttpServer() {
 	s := &http.Server{
 		Addr:              address,
 		Handler:           router,
-		ReadTimeout:       20 * time.Second,
+		ReadTimeout:       0,
 		ReadHeaderTimeout: 20 * time.Second,
 		WriteTimeout:      20 * time.Second,
 		MaxHeaderBytes:    1 << 20,
