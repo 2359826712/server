@@ -51,7 +51,33 @@ func TestHttpQuery(t *testing.T) {
 	for i := 0; i < 3000; i++ {
 		testQuery(i, do)
 	}
+	//testReset(do)
 	time.Sleep(time.Minute)
+}
+
+func testReset(do func(req *http.Request) (*http.Response, error)) {
+	url := "http://192.168.20.66:9096/resetQueryCounter"
+	q := &request.QueryReq{
+		BaseInfo: model.BaseInfo{
+			GameName: "arc_game",
+		},
+	}
+	b, _ := json.Marshal(q)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
+	if err != nil {
+		panic(fmt.Errorf("req err: %v", err))
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := do(req)
+	if err != nil {
+		panic(fmt.Errorf("client err: %v", err))
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		panic(fmt.Errorf("read resp err: %v", err))
+	}
+	_, _ = data, err
 }
 
 func testQuery(index int, do func(req *http.Request) (*http.Response, error)) {
@@ -59,7 +85,8 @@ func testQuery(index int, do func(req *http.Request) (*http.Response, error)) {
 	start := time.Now()
 	url := "http://192.168.20.66:9096/query_no_update"
 	q := &request.QueryReq{
-		Cnt: 10,
+		Cnt:    1,
+		IsDesc: false,
 		BaseInfo: model.BaseInfo{
 			GameName: "arc_game",
 		},

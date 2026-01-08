@@ -29,9 +29,10 @@ type Account struct {
 }
 
 type Counter struct {
-	ID       int    `json:"ID" gorm:"primaryKey"`
-	GameName string `json:"game_name"`
-	Counter  int64  `json:"counter"`
+	ID          int    `json:"ID" gorm:"primaryKey"`
+	GameName    string `json:"game_name"`
+	Counter     int64  `json:"counter"`
+	DescCounter int64  `json:"desc_counter"`
 }
 
 // D2迁移到数据库
@@ -58,9 +59,9 @@ func AutoMigrate(gameName string) error {
 }
 
 func AutoMigrateCounters() error {
-	createTableSql := `CREATE TABLE IF NOT EXISTS counters (id INT PRIMARY KEY AUTO_INCREMENT,game_name VARCHAR(255),counter INT)`
+	createTableSql := `CREATE TABLE IF NOT EXISTS counters_esc (id INT PRIMARY KEY AUTO_INCREMENT,game_name VARCHAR(255),counter INT, desc_counter INT)`
 	if err := global.DB.Exec(createTableSql).Error; err != nil {
-		return fmt.Errorf("Failed to create table counters: %v", err)
+		return fmt.Errorf("Failed to create table counters_esc: %v", err)
 	}
 	return nil
 }
