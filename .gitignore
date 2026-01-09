@@ -1,0 +1,7 @@
+ocr_server/build/
+ocr_server/__pycache__/
+ocr_server/*.spec
+ocr_server/.pytest_cache/
+**/__pycache__/
+**/*.pyc
+ocr_server_local/
