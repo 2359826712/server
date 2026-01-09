@@ -1,7 +1,70 @@
-ocr_server/build/
-ocr_server/__pycache__/
-ocr_server/*.spec
-ocr_server/.pytest_cache/
-**/__pycache__/
-**/*.pyc
+# ============== 二进制/可执行文件 ==============
+*.exe
+*.pyd
+*.dll
+*.pkg
+*.so
+*.dylib
+*.bin
+*.dat
+*.model
+*.weights
+
+# ============== 编译输出目录 ==============
+__pycache__/
+*.py[cod]
+*$py.class
+build/
+dist/
+*.egg-info/
+.eggs/
 ocr_server_local/
+ocr_server/dist/
+ocr_server/build/
+
+# ============== 压缩文件 ==============
+*.zip
+*.tar.gz
+*.7z
+*.rar
+*.gz
+*.bz2
+
+# ============== 数据文件 ==============
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+*.joblib
+*.npz
+*.npy
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.db
+*.sqlite
+*.sqlite3
+
+# ============== 大文件目录 ==============
+# OCR 相关大文件目录
+_internal/
+paddle/
+torch/
+cv2/
+mkl/
+
+# ============== IDE 和系统文件 ==============
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ============== 日志和临时文件 ==============
+*.log
+*.tmp
+temp/
+tmp/
+logs/
