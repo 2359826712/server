@@ -13,6 +13,7 @@ import multiprocessing
 import queue
 import threading
 import traceback
+import time
 import uuid
 from collections import OrderedDict
 
@@ -180,11 +181,11 @@ def _worker_main(task_queue, result_queue, worker_index):
                     continue
             except Exception:
                 cache_key = None
-
+            
             try:
-                result = ocr.ocr(img, cls=use_angle_cls)
+                result = ocr.predict(img, cls=use_angle_cls)
             except TypeError:
-                result = ocr.ocr(img)
+                result = ocr.predict(img)
 
             parsed_result = _parse_ocr_result(result, target_text)
 
@@ -273,6 +274,7 @@ class OcrProcessPool:
 
 @app.post("/ocr/predict")
 def ocr_predict():
+    t0 = time.perf_counter()
     try:
         payload = None
         try:
@@ -295,8 +297,10 @@ def ocr_predict():
             return jsonify({"code": -1, "msg": "Invalid worker response"}), 500
 
         if res.get("code") == 0:
+            logging.info("ocr_predict ok cost_ms=%.1f", (time.perf_counter() - t0) * 1000.0)
             return jsonify({"code": 0, "data": res.get("data")})
         status = int(res.get("status", 500))
+        logging.info("ocr_predict fail status=%s cost_ms=%.1f", status, (time.perf_counter() - t0) * 1000.0)
         return jsonify({"code": -1, "msg": res.get("msg")}), status
     except Exception as e:
         logging.error(f"OCR failed: {e}")
@@ -309,6 +313,7 @@ def main():
     host = os.environ.get("OCR_SERVER_HOST", "0.0.0.0")
     port = int(os.environ.get("OCR_SERVER_PORT", "8000"))
     worker_count = int(os.environ.get("OCR_WORKERS", str(max(1, (os.cpu_count() or 2) // 2))))
+    logging.info("Starting OCR server host=%s port=%s workers=%s", host, port, worker_count)
     pool = OcrProcessPool(worker_count=worker_count)
     app.config["OCR_POOL"] = pool
     try:
