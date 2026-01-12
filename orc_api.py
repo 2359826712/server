@@ -24,10 +24,11 @@ class Arc_api:
     def __init__(self):
         if not self._initialized:
             self._http = requests.Session()
-            self.ocr_server_url = (os.environ.get("OCR_SERVER_URL") or "http://127.0.0.1:8000").rstrip("/")
+            # 默认指向本地的新版 FastAPI 服务器 (默认端口 8000)
+            self.ocr_server_url = "http://192.168.20.81:8000"
             self._initialized = True
 
-    def ocr_text(self, x1, y1, x2, y2, target_text="", timeout=5, max_side=720, use_angle_cls=False, ocr_server_url=None):
+    def ocr_text(self, x1, y1, x2, y2, target_text="", timeout=5, max_side=736, use_angle_cls=False, ocr_server_url=None):
         base_url = None
         try:
             w = x2 - x1
@@ -36,6 +37,12 @@ class Arc_api:
                 return None
 
             img_str = None
+            
+            # 为了提速，可以在截图时直接缩放图片，而不是传大图给服务器缩放
+            # 如果截取区域很大，建议先缩小
+            should_resize_local = False
+            if max_side and (w > max_side or h > max_side):
+                should_resize_local = True
 
             if _has_mss:
                 try:
@@ -47,7 +54,16 @@ class Arc_api:
                         shot = sct.grab(monitor)
                         frame = _np.array(shot)[:, :, :3]
                         frame = _cv2.cvtColor(frame, _cv2.COLOR_BGRA2BGR)
-                        ok, buf = _cv2.imencode(".jpg", frame, [_cv2.IMWRITE_JPEG_QUALITY, 75])
+                        
+                        # 本地缩放优化
+                        if should_resize_local:
+                            scale = max_side / float(max(w, h))
+                            new_w = int(w * scale)
+                            new_h = int(h * scale)
+                            frame = _cv2.resize(frame, (new_w, new_h))
+                        
+                        # 降低 JPEG 质量以减少网络传输耗时 (75 -> 60)
+                        ok, buf = _cv2.imencode(".jpg", frame, [_cv2.IMWRITE_JPEG_QUALITY, 60])
                         if ok:
                             img_str = base64.b64encode(buf.tobytes()).decode()
                 except Exception:
@@ -58,8 +74,13 @@ class Arc_api:
                     import pyautogui
 
                     img = pyautogui.screenshot(region=(x1, y1, w, h))
+                    
+                    if should_resize_local:
+                        img.thumbnail((max_side, max_side))
+                        
                     buffered = io.BytesIO()
-                    img.save(buffered, format="JPEG")
+                    # 降低 JPEG 质量
+                    img.save(buffered, format="JPEG", quality=60)
                     img_str = base64.b64encode(buffered.getvalue()).decode()
                 except Exception as e:
                     print(
@@ -67,12 +88,13 @@ class Arc_api:
                     )
                     raise e
 
-            base_url = (ocr_server_url or self.ocr_server_url or "http://127.0.0.1:8000").rstrip("/")
+            base_url = (ocr_server_url or self.ocr_server_url).rstrip("/")
             url = f"{base_url}/ocr/predict"
             payload = {
                 "image_base64": img_str,
                 "target_text": target_text,
-                "max_side": max_side,
+                "max_side": max_side,  # 服务器端也会检查，双重保障
+                "limit_side_len": max_side, # 显式传递给新版服务器
                 "use_angle_cls": use_angle_cls,
             }
 

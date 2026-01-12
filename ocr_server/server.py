@@ -22,13 +22,8 @@ from flask import Flask, jsonify, request
 import cv2
 import numpy as np
 
-try:
-    import paddlex.utils.deps as _px_deps
-
-    _px_deps.require_extra = lambda *args, **kwargs: None
-    _px_deps.require_deps = lambda *args, **kwargs: None
-except Exception:
-    pass
+# Removed top-level paddlex patch to prevent initialization issues
+# The patching is now handled inside _worker_main
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -128,23 +123,59 @@ def _worker_main(task_queue, result_queue, worker_index):
     os.environ.setdefault("DISABLE_MODEL_SOURCE_CHECK", "True")
     os.environ.setdefault("PADDLEOCR_HOME", os.path.join(_BASE_DIR, "paddleocr_home"))
 
+    import sys
+    from types import ModuleType
+
+    # MOCK PADDLEX REMOVED to allow real initialization
+    # if 'paddlex' not in sys.modules:
+    #     pdx = ModuleType('paddlex')
+    #     ... (all mocked code commented out)
+    
     try:
-        import paddlex.utils.deps as _px_deps
+        from paddleocr.paddleocr import PaddleOCR
+    except ImportError:
+        from paddleocr import PaddleOCR
+    
+    logging.info(f"PaddleOCR imported from {PaddleOCR.__module__}")
 
-        _px_deps.require_extra = lambda *args, **kwargs: None
-        _px_deps.require_deps = lambda *args, **kwargs: None
-    except Exception:
-        pass
+    # GPU / CPU 配置
+    use_gpu = os.environ.get("OCR_USE_GPU", "False").lower() == "true"
+    
+    # CPU 加速配置 (仅当不使用 GPU 时生效)
+    enable_mkldnn = os.environ.get("OCR_ENABLE_MKLDNN", "True").lower() == "true"
+    cpu_threads = int(os.environ.get("OCR_CPU_THREADS", "10"))
+    
+    device = "gpu" if use_gpu else "cpu"
+    
+    ocr = None
+    try:
+        ocr = PaddleOCR(
+            device=device,
+            use_doc_orientation_classify=False,
+            use_doc_unwarping=False,
+            use_textline_orientation=True,
+            lang="ch",
+            ocr_version="PP-OCRv4",
+            enable_mkldnn=enable_mkldnn,
+            cpu_threads=cpu_threads
+        )
+    except Exception as e:
+        import traceback
+        logging.error(f"Failed to initialize PaddleOCR: {e}")
+        logging.error(traceback.format_exc())
+        # Keep running to allow logging to flush, but maybe exit?
+        # If we exit here, the process dies and pool might restart it indefinitely.
+        # Let's wait a bit to ensure log is written.
+        time.sleep(1)
+        # We can't really recover, so re-raise or exit.
+        raise e
 
-    from paddleocr import PaddleOCR
-
-    ocr = PaddleOCR(
-        use_doc_orientation_classify=False,
-        use_doc_unwarping=False,
-        use_textline_orientation=True,
-        lang="ch",
-        ocr_version="PP-OCRv4",
-    )
+    logging.info(f"Worker {os.getpid()} PaddleOCR init done. ocr={ocr}")
+    try:
+        logging.info(f"ocr.text_detector={getattr(ocr, 'text_detector', 'N/A')}")
+        logging.info(f"ocr.text_recognizer={getattr(ocr, 'text_recognizer', 'N/A')}")
+    except Exception as e:
+        logging.error(f"Error checking ocr attributes: {e}")
 
     ocr_cache = OrderedDict()
     ocr_cache_max = 32
@@ -182,10 +213,27 @@ def _worker_main(task_queue, result_queue, worker_index):
             except Exception:
                 cache_key = None
             
+            limit_side_len = int(payload.get("limit_side_len") or os.environ.get("OCR_LIMIT_SIDE_LEN", "960"))
+            
             try:
-                result = ocr.predict(img, cls=use_angle_cls)
-            except TypeError:
-                result = ocr.predict(img)
+                # 动态参数支持
+                # 如果传入 det_limit_side_len 则使用传入值
+                # 如果没有，则使用默认值
+                # 注意：ocr.predict 并不直接接收 limit_side_len，
+                # 但可以通过 ocr.text_detector_module.limit_side_len 来临时修改(不推荐并发下修改)
+                # 或者调用时传递 (如果 PaddleOCR 封装支持的话，v2.6+ 支持 det_limit_side_len)
+                
+                # 检查是否支持 det_limit_side_len
+                # PaddleOCR.predict(img, cls=True, det=True, rec=True, type_list=None, **kwargs)
+                # kwargs 会传递给 detector
+                
+                result = ocr.ocr(img, cls=use_angle_cls, det=True, rec=True, det_limit_side_len=limit_side_len)
+            except Exception:
+                # 降级尝试，兼容旧版本
+                 try:
+                    result = ocr.predict(img, cls=use_angle_cls)
+                 except TypeError:
+                    result = ocr.predict(img)
 
             parsed_result = _parse_ocr_result(result, target_text)
 
@@ -312,7 +360,11 @@ def main():
     multiprocessing.freeze_support()
     host = os.environ.get("OCR_SERVER_HOST", "0.0.0.0")
     port = int(os.environ.get("OCR_SERVER_PORT", "8000"))
-    worker_count = int(os.environ.get("OCR_WORKERS", str(max(1, (os.cpu_count() or 2) // 2))))
+    use_gpu = os.environ.get("OCR_USE_GPU", "False").lower() == "true"
+    if "OCR_WORKERS" in os.environ:
+        worker_count = int(os.environ["OCR_WORKERS"])
+    else:
+        worker_count = 1 if use_gpu else int(str(max(1, (os.cpu_count() or 2) // 2)))
     logging.info("Starting OCR server host=%s port=%s workers=%s", host, port, worker_count)
     pool = OcrProcessPool(worker_count=worker_count)
     app.config["OCR_POOL"] = pool

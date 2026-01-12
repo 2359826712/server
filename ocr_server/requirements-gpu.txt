@@ -2,7 +2,7 @@ flask
 numpy
 opencv-python
 paddleocr
-paddlepaddle
+paddlepaddle-gpu
 fastapi
 uvicorn
 python-multipart
