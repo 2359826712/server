@@ -7,6 +7,33 @@ import traceback
 import multiprocessing
 from typing import Optional, List, Dict, Any, Union
 
+# --- 自动注入 NVIDIA DLL 路径 (修复 cudnn64_9.dll 找不到的问题) ---
+if os.name == 'nt':
+    try:
+        libs = []
+        try:
+            import nvidia.cudnn
+            libs.append(os.path.dirname(nvidia.cudnn.__file__))
+        except ImportError:
+            pass
+        try:
+            import nvidia.cublas
+            libs.append(os.path.dirname(nvidia.cublas.__file__))
+        except ImportError:
+            pass
+            
+        for lib_dir in libs:
+            for sub in ['', 'bin', 'lib']:
+                path = os.path.join(lib_dir, sub)
+                if os.path.exists(path):
+                    os.environ['PATH'] = path + os.pathsep + os.environ['PATH']
+                    if hasattr(os, 'add_dll_directory'):
+                        try: os.add_dll_directory(path)
+                        except: pass
+    except Exception as e:
+        print(f"Warning: Failed to add NVIDIA DLL paths: {e}")
+# -----------------------------------------------------------
+
 from fastapi import FastAPI, UploadFile, File, Body, HTTPException, Request
 from pydantic import BaseModel
 import uvicorn

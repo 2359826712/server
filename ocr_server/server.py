@@ -7,6 +7,34 @@ _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 os.environ.setdefault("DISABLE_MODEL_SOURCE_CHECK", "True")
 os.environ.setdefault("PADDLEOCR_HOME", os.path.join(_BASE_DIR, "paddleocr_home"))
 
+# --- 自动注入 NVIDIA DLL 路径 (修复 cudnn64_9.dll 找不到的问题) ---
+if os.name == 'nt':
+    try:
+        libs = []
+        try:
+            import nvidia.cudnn
+            libs.append(os.path.dirname(nvidia.cudnn.__file__))
+        except ImportError:
+            pass
+        try:
+            import nvidia.cublas
+            libs.append(os.path.dirname(nvidia.cublas.__file__))
+        except ImportError:
+            pass
+            
+        for lib_dir in libs:
+            # 常见路径模式：包根目录, bin, lib
+            for sub in ['', 'bin', 'lib']:
+                path = os.path.join(lib_dir, sub)
+                if os.path.exists(path):
+                    os.environ['PATH'] = path + os.pathsep + os.environ['PATH']
+                    if hasattr(os, 'add_dll_directory'):
+                        try: os.add_dll_directory(path)
+                        except: pass
+    except Exception as e:
+        print(f"Warning: Failed to add NVIDIA DLL paths: {e}")
+# -----------------------------------------------------------
+
 import base64
 import logging
 import multiprocessing
@@ -174,8 +202,18 @@ def _worker_main(task_queue, result_queue, worker_index):
     try:
         logging.info(f"ocr.text_detector={getattr(ocr, 'text_detector', 'N/A')}")
         logging.info(f"ocr.text_recognizer={getattr(ocr, 'text_recognizer', 'N/A')}")
+        
+        # --- Warmup ---
+        logging.info("Warming up OCR model...")
+        warmup_start = time.time()
+        dummy_img = np.zeros((300, 300, 3), dtype=np.uint8)
+        # 绘制一些文本以确保触发所有模型路径
+        cv2.putText(dummy_img, "Warmup", (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        ocr.ocr(dummy_img, cls=True, det=True, rec=True)
+        logging.info(f"Warmup done in {time.time() - warmup_start:.2f}s")
+        # --------------
     except Exception as e:
-        logging.error(f"Error checking ocr attributes: {e}")
+        logging.error(f"Error checking ocr attributes or warmup: {e}")
 
     ocr_cache = OrderedDict()
     ocr_cache_max = 32
@@ -214,6 +252,7 @@ def _worker_main(task_queue, result_queue, worker_index):
                 cache_key = None
             
             limit_side_len = int(payload.get("limit_side_len") or os.environ.get("OCR_LIMIT_SIDE_LEN", "960"))
+            rec_batch_num = int(payload.get("rec_batch_num") or os.environ.get("OCR_REC_BATCH_NUM", "6"))
             
             try:
                 # 动态参数支持
@@ -227,7 +266,7 @@ def _worker_main(task_queue, result_queue, worker_index):
                 # PaddleOCR.predict(img, cls=True, det=True, rec=True, type_list=None, **kwargs)
                 # kwargs 会传递给 detector
                 
-                result = ocr.ocr(img, cls=use_angle_cls, det=True, rec=True, det_limit_side_len=limit_side_len)
+                result = ocr.ocr(img, cls=use_angle_cls, det=True, rec=True, det_limit_side_len=limit_side_len, rec_batch_num=rec_batch_num)
             except Exception:
                 # 降级尝试，兼容旧版本
                  try:

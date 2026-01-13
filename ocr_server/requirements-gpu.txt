@@ -3,6 +3,9 @@ numpy
 opencv-python
 paddleocr
 paddlepaddle-gpu
+nvidia-pyindex
+nvidia-cudnn-cu12
+nvidia-cublas-cu12
 fastapi
 uvicorn
 python-multipart

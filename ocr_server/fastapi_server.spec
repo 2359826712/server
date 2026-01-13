@@ -42,6 +42,8 @@ for pkg in [
     "paddlex",
     "pyclipper",
     "shapely",
+    "nvidia.cudnn",
+    "nvidia.cublas",
 ]:
     try:
         tmp_ret = collect_all(pkg)
@@ -115,7 +117,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='ocr_server_fastapi',
+    name='ocr_server_fastapi_v3',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -135,5 +137,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='ocr_server_fastapi',
+    name='ocr_server_fastapi_v3',
 )
