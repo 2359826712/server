@@ -117,7 +117,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='ocr_server_fastapi_v3',
+    name='ocr_server_fastapi_v4',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -137,5 +137,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='ocr_server_fastapi_v3',
+    name='ocr_server_fastapi_v4',
 )

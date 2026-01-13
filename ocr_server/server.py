@@ -209,8 +209,14 @@ def _worker_main(task_queue, result_queue, worker_index):
         dummy_img = np.zeros((300, 300, 3), dtype=np.uint8)
         # 绘制一些文本以确保触发所有模型路径
         cv2.putText(dummy_img, "Warmup", (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        ocr.ocr(dummy_img, cls=True, det=True, rec=True)
-        logging.info(f"Warmup done in {time.time() - warmup_start:.2f}s")
+        # cls=False 因为初始化时可能未加载方向分类器，避免报错
+        try:
+            ocr.ocr(dummy_img, cls=False, det=True, rec=True)
+            logging.info(f"Warmup done in {time.time() - warmup_start:.2f}s")
+        except TypeError:
+            # 如果还不支持，尝试旧版调用
+            ocr.predict(dummy_img)
+            logging.info(f"Warmup done (legacy mode) in {time.time() - warmup_start:.2f}s")
         # --------------
     except Exception as e:
         logging.error(f"Error checking ocr attributes or warmup: {e}")

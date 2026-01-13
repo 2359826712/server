@@ -56,10 +56,10 @@ func TestHttpQuery(t *testing.T) {
 }
 
 func testReset(do func(req *http.Request) (*http.Response, error)) {
-	url := "http://192.168.20.66:9096/resetQueryCounter"
+	url := "http://192.168.2.99:9096/resetQueryCounter"
 	q := &request.QueryReq{
 		BaseInfo: model.BaseInfo{
-			GameName: "arc_game",
+			GameName: "fifa",
 		},
 	}
 	b, _ := json.Marshal(q)
@@ -83,12 +83,12 @@ func testReset(do func(req *http.Request) (*http.Response, error)) {
 func testQuery(index int, do func(req *http.Request) (*http.Response, error)) {
 	//fmt.Println("开始请求", index)
 	start := time.Now()
-	url := "http://192.168.20.66:9096/query_no_update"
+	url := "http://192.168.2.99:9096/query_no_update"
 	q := &request.QueryReq{
 		Cnt:    1,
 		IsDesc: false,
 		BaseInfo: model.BaseInfo{
-			GameName: "arc_game",
+			GameName: "fsjs",
 		},
 	}
 	b, _ := json.Marshal(q)

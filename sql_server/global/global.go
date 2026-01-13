@@ -1,11 +1,14 @@
 package global
 
 import (
-	"gorm.io/gorm"
 	"sql_server/config"
+	"sql_server/utils/timer"
+
+	"gorm.io/gorm"
 )
 
 var (
 	DB     *gorm.DB
 	Config config.Config
+	Timer  timer.Timer = timer.NewTimerTask()
 )

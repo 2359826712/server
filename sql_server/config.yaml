@@ -8,3 +8,6 @@ mysql:
 service:
   tcp_port: 9090
   http_port: 9096
+cache:
+  insert_count: 500
+  query_count: 50000

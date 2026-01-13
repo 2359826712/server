@@ -3,10 +3,12 @@ package initialize
 import (
 	"database/sql"
 	"fmt"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
 	"log"
 	"sql_server/config"
+	"time"
+
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 func InitGormDb(ms config.Mysql) *gorm.DB {
@@ -29,6 +31,11 @@ func InitGormDb(ms config.Mysql) *gorm.DB {
 	if err != nil {
 		panic(err)
 	}
+	sqlDB, _ := db.DB()
+	sqlDB.SetMaxIdleConns(50)
+	sqlDB.SetMaxOpenConns(2000)
+	sqlDB.SetConnMaxLifetime(time.Hour)
+	sqlDB.SetConnMaxIdleTime(30 * time.Minute)
 	return db
 }
 

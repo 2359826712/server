@@ -11,18 +11,31 @@ from typing import Optional, List, Dict, Any, Union
 if os.name == 'nt':
     try:
         libs = []
-        try:
-            import nvidia.cudnn
-            libs.append(os.path.dirname(nvidia.cudnn.__file__))
-        except ImportError:
-            pass
-        try:
-            import nvidia.cublas
-            libs.append(os.path.dirname(nvidia.cublas.__file__))
-        except ImportError:
-            pass
+        # 检测 PyInstaller 环境
+        if getattr(sys, 'frozen', False):
+            base_dir = os.path.dirname(sys.executable)
+            # 在 _internal 中查找 nvidia 相关目录
+            internal_dir = os.path.join(base_dir, '_internal')
+            if os.path.exists(internal_dir):
+                for root, dirs, files in os.walk(internal_dir):
+                    if 'nvidia' in root:
+                         libs.append(root)
+        else:
+            try:
+                import nvidia.cudnn
+                if hasattr(nvidia.cudnn, '__file__') and nvidia.cudnn.__file__:
+                    libs.append(os.path.dirname(nvidia.cudnn.__file__))
+            except ImportError:
+                pass
+            try:
+                import nvidia.cublas
+                if hasattr(nvidia.cublas, '__file__') and nvidia.cublas.__file__:
+                    libs.append(os.path.dirname(nvidia.cublas.__file__))
+            except ImportError:
+                pass
             
         for lib_dir in libs:
+            # 常见路径模式：包根目录, bin, lib
             for sub in ['', 'bin', 'lib']:
                 path = os.path.join(lib_dir, sub)
                 if os.path.exists(path):

@@ -19,5 +19,4 @@ func main() {
 	}
 	//service.StartTcpServer()
 	service.StartHttpServer()
-
 }

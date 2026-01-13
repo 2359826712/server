@@ -2,6 +2,9 @@ import os
 import struct
 import subprocess
 import sys
+import shutil
+import tempfile
+import time
 
 def main():
     if struct.calcsize("P") * 8 != 64:
@@ -44,7 +47,16 @@ def main():
         sys.exit(1)
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    
+    work_dir = os.path.join(base_dir, "build_v4")
+    dist_dir = os.path.join(base_dir, "dist_v4")
+    try:
+        if os.path.isdir(work_dir):
+            shutil.rmtree(work_dir, ignore_errors=True)
+        if os.path.isdir(dist_dir):
+            shutil.rmtree(dist_dir, ignore_errors=True)
+    except Exception:
+        time.sleep(1)
+
     # 2. 生成 spec 文件内容
     # 优化：减少不必要的 collect_all，增加 excludes
     spec_content = r"""# -*- mode: python ; coding: utf-8 -*-
@@ -166,7 +178,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='ocr_server_fastapi_v3',
+    name='ocr_server_fastapi_v4',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -186,7 +198,7 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='ocr_server_fastapi_v3',
+    name='ocr_server_fastapi_v4',
 )
 """
     
@@ -201,10 +213,17 @@ coll = COLLECT(
     # 3. 调用 PyInstaller
     # --noconfirm: 不询问覆盖
     # --clean: 清理缓存
-    subprocess.check_call([sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", spec_path], cwd=base_dir)
-    
+    subprocess.check_call([
+        sys.executable, "-m", "PyInstaller",
+        "--noconfirm",
+        "--clean",
+        "--workpath", work_dir,
+        "--distpath", dist_dir,
+        spec_path
+    ], cwd=base_dir)
+
     print("\nBuild completed!")
-    print(f"Executable is located at: {os.path.join(base_dir, 'dist', 'ocr_server_fastapi', 'ocr_server_fastapi.exe')}")
+    print(f"Executable is located at: {os.path.join(dist_dir, 'ocr_server_fastapi_v4', 'ocr_server_fastapi_v4.exe')}")
 
 if __name__ == "__main__":
     main()

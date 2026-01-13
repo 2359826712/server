@@ -2,41 +2,32 @@
 cd /d "%~dp0"
 echo Starting OCR Server...
 
-REM --- Configuration ---
-REM Use GPU (True/False)
 set OCR_USE_GPU=True
 
-REM Disable PaddlePaddle model source check to speed up startup
 set DISABLE_MODEL_SOURCE_CHECK=True
 
-REM Max image side length (640-960)
 set OCR_LIMIT_SIDE_LEN=736
 
-REM Worker processes (1 for GPU)
 set OCR_WORKERS=1
-REM ---------------------
 
 echo Config: GPU=%OCR_USE_GPU%, Size=%OCR_LIMIT_SIDE_LEN%, Workers=%OCR_WORKERS%
 echo Please ensure VC++ Redistributable and GPU drivers are installed.
 echo.
 
-REM Check if exe exists in current folder (Deployed mode)
-if exist "ocr_server_fastapi.exe" (
-    echo Found executable in current directory.
-    ocr_server_fastapi.exe
+if exist "ocr_server_fastapi_v4.exe" (
+    echo Found v4 executable in current directory.
+    ocr_server_fastapi_v4.exe
     goto :end
 )
 
-REM Check if exe exists in dist folder (Dev/Build mode)
-if exist "dist\ocr_server_fastapi\ocr_server_fastapi.exe" (
-    echo Found executable in dist folder. Switching directory...
-    cd "dist\ocr_server_fastapi"
-    ocr_server_fastapi.exe
+if exist "dist\ocr_server_fastapi_v4\ocr_server_fastapi_v4.exe" (
+    echo Found v4 executable in dist folder. Switching directory...
+    cd "dist\ocr_server_fastapi_v4"
+    ocr_server_fastapi_v4.exe
     goto :end
 )
 
-REM If not found
-echo ERROR: Could not find 'ocr_server_fastapi.exe'.
+echo ERROR: Could not find 'ocr_server_fastapi_v4.exe'.
 echo.
 echo Attempting to run from source code...
 if exist "fastapi_server.py" (

@@ -25,7 +25,7 @@ class Arc_api:
         if not self._initialized:
             self._http = requests.Session()
             # 默认指向本地的新版 FastAPI 服务器 (默认端口 8000)
-            self.ocr_server_url = "http://127.0.0.1:8000"
+            self.ocr_server_url = "http://192.168.20.81:8000"
             self._initialized = True
 
     def ocr_text(self, x1, y1, x2, y2, target_text="", timeout=5, max_side=736, use_angle_cls=False, ocr_server_url=None):

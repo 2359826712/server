@@ -6,25 +6,12 @@ import (
 	"sql_server/global"
 	"sql_server/model"
 	"sql_server/model/request"
-	"sync"
 	"time"
 
 	"gorm.io/gorm"
 )
 
 var MysqlService = mysqlService{locker: &lockList{}}
-
-type lockList struct {
-	locks sync.Map
-}
-
-func (l *lockList) getLock(gameName string) *sync.Mutex {
-	lock, loaded := l.locks.LoadOrStore(gameName, new(sync.Mutex))
-	if !loaded {
-		return lock.(*sync.Mutex)
-	}
-	return lock.(*sync.Mutex)
-}
 
 type mysqlService struct {
 	locker *lockList
@@ -41,30 +28,17 @@ func (m *mysqlService) NewGame(gameName string) error {
 	return model.AutoMigrate(gameName)
 }
 
-// 新增数据
 func (m *mysqlService) Insert(base *model.BaseInfo) error {
-	if base == nil {
-		return errors.New("数据为空")
-	}
-	if err := checkGameModel(base); err != nil {
+	list, err := Insert(base)
+	if err != nil {
 		return err
 	}
-	lock := m.locker.getLock(base.GameName)
-	lock.Lock()
-	defer lock.Unlock()
-	acc := &model.Account{
-		BaseInfo:   *base,
-		OnlineTime: time.Now(),
-	}
-	var g = &model.Account{}
-	err := global.DB.Table(base.GameName).Where("account", base.Account).First(g).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return global.DB.Table(base.GameName).Create(acc).Error
-	} else if g.GameName != "" {
-		return m.update(base)
-	} else {
-		return err
-	}
+	go func() {
+		for _, v := range list {
+			_ = m.insert(v)
+		}
+	}()
+	return nil
 }
 
 // 即再次采集
@@ -78,32 +52,10 @@ func (m *mysqlService) Update(game *model.BaseInfo) error {
 	lock := m.locker.getLock(game.GameName)
 	lock.Lock()
 	defer lock.Unlock()
-	return m.update(game)
-}
-
-func (m *mysqlService) update(game *model.BaseInfo) error {
-	if game == nil {
-		return errors.New("数据为空")
-	}
-	db := global.DB.Table(game.GameName).Where("account = ?", game.Account)
 	acc := &model.Account{
-		BaseInfo:   *game,
-		OnlineTime: time.Now(),
+		BaseInfo: *game,
 	}
-	return db.Select("b_zone", "s_zone", "rating", "online_time").Updates(acc).Error
-}
-
-func (m *mysqlService) updateTalkTime(list []*model.BaseInfo, talkChannel string) error {
-	if talkChannel == "" {
-		return errors.New("talk_channel is empty")
-	}
-	now := time.Now()
-	for _, gm := range list {
-		if err := global.DB.Table(gm.GameName).Where("id = ?", gm.ID).Update(talkChannel, now).Error; err != nil {
-			return err
-		}
-	}
-	return nil
+	return m.update(acc)
 }
 
 func (m *mysqlService) ClearTalkTime(gameName string, talkChannel uint) error {
@@ -126,6 +78,7 @@ func (m *mysqlService) ResetQueryCounter(gameName string) error {
 	if err := global.DB.Table(gameName).Count(&total).Error; err != nil {
 		return err
 	}
+	ResetCounter(gameName, int(total))
 	return global.DB.Table("counters_esc").Where("game_name = ?", gameName).Updates(
 		map[string]interface{}{
 			"counter":      0,
@@ -179,6 +132,9 @@ func (m *mysqlService) Query(query *request.QueryReq) (list []*model.BaseInfo, e
 	if err = db.Limit(int(query.Cnt)).Where("game_name = ?", query.GameName).Find(&list).Error; err != nil {
 		return nil, err
 	}
+	if len(list) == 0 {
+		return Query(query), nil
+	}
 	if err = m.updateTalkTime(list, talkChannel); err != nil {
 		return nil, err
 	}
@@ -192,53 +148,82 @@ func (m *mysqlService) QueryNoUpdate(query *request.QueryReq) (list []*model.Bas
 	if err = checkGameName(query.GameName); err != nil {
 		return nil, err
 	}
-	lock := m.locker.getLock(query.GameName + "counter")
-	// 先计数
-	lock.Lock()
-	var cter = model.Counter{
-		GameName: query.GameName,
-	}
-	err = global.DB.Table("counters_esc").Where("game_name = ?", query.GameName).FirstOrCreate(&cter).Error
-	if err != nil {
-		lock.Unlock()
-		return nil, err
-	}
-	if cter.DescCounter == 0 {
-		global.DB.Table(query.GameName).Count(&cter.DescCounter)
-	}
-	if query.IsDesc {
-		err = global.DB.Table("counters_esc").Where("game_name = ?", query.GameName).Update("desc_counter", cter.DescCounter-int64(query.Cnt)).Error
-	} else {
-		err = global.DB.Table("counters_esc").Where("game_name = ?", query.GameName).Update("counter", cter.Counter+int64(query.Cnt)).Error
-	}
-	lock.Unlock()
-	if err != nil {
-		return nil, err
-	}
-	gm := query.BaseInfo
-	db := global.DB.Table(gm.GameName).Select("*")
 	// 默认至少一条
 	if query.Cnt == 0 {
 		query.Cnt = 1
 	}
-	list = make([]*model.BaseInfo, 0)
 	if query.IsDesc {
-		if cter.DescCounter-int64(query.Cnt) < 0 {
-			return nil, QueryToEndErr
-		}
-		if err = db.Limit(int(query.Cnt)).Where("game_name = ? and id < ? and id >= ?", query.GameName, cter.DescCounter, cter.DescCounter-int64(query.Cnt)).Find(&list).Error; err != nil {
-			return nil, err
-		}
-	} else {
-		if err = db.Limit(int(query.Cnt)).Where("game_name = ? and id > ?", query.GameName, cter.Counter).Find(&list).Error; err != nil {
-			return nil, err
-		}
+		return QueryDesc(query)
 	}
-	if len(list) == 0 {
-		return nil, QueryToEndErr
-	}
+	return QueryAesc(query)
+}
 
-	return list, err
+// 新增数据
+func (m *mysqlService) insert(acc *model.Account) error {
+	if acc == nil {
+		return errors.New("数据为空")
+	}
+	if err := checkGameModel(&acc.BaseInfo); err != nil {
+		return err
+	}
+	lock := m.locker.getLock(acc.GameName)
+	lock.Lock()
+	defer lock.Unlock()
+
+	var g = &model.Account{}
+	err := global.DB.Table(acc.GameName).Where("account", acc.Account).First(g).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return global.DB.Table(acc.GameName).Create(acc).Error
+	} else if g.GameName != "" {
+		return m.update(acc)
+	} else {
+		return err
+	}
+}
+
+func (m *mysqlService) update(acc *model.Account) error {
+	if acc == nil {
+		return errors.New("数据为空")
+	}
+	db := global.DB.Table(acc.GameName).Where("account = ?", acc.Account)
+	var updateMap = map[string]interface{}{
+		"b_zone":      acc.BZone,
+		"s_zone":      acc.SZone,
+		"rating":      acc.Rating,
+		"online_time": time.Now(),
+	}
+	if !acc.LastTalkTime1.IsZero() {
+		updateMap["last_talk_time1"] = acc.LastTalkTime1
+	}
+	if !acc.LastTalkTime2.IsZero() {
+		updateMap["last_talk_time2"] = acc.LastTalkTime2
+	}
+	if !acc.LastTalkTime3.IsZero() {
+		updateMap["last_talk_time3"] = acc.LastTalkTime3
+	}
+	if !acc.LastTalkTime4.IsZero() {
+		updateMap["last_talk_time4"] = acc.LastTalkTime4
+	}
+	if !acc.LastTalkTime5.IsZero() {
+		updateMap["last_talk_time5"] = acc.LastTalkTime5
+	}
+	if !acc.LastTalkTime6.IsZero() {
+		updateMap["last_talk_time6"] = acc.LastTalkTime6
+	}
+	return db.Updates(updateMap).Error
+}
+
+func (m *mysqlService) updateTalkTime(list []*model.BaseInfo, talkChannel string) error {
+	if talkChannel == "" {
+		return errors.New("talk_channel is empty")
+	}
+	now := time.Now()
+	for _, gm := range list {
+		if err := global.DB.Table(gm.GameName).Where("id = ?", gm.ID).Update(talkChannel, now).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func getTalkChannel(talkChannel uint) (string, error) {
