@@ -105,6 +105,7 @@ for pkg in [
     "shapely",
     "nvidia.cudnn",
     "nvidia.cublas",
+    "websockets",
 ]:
     try:
         tmp_ret = collect_all(pkg)
@@ -117,9 +118,14 @@ for pkg in [
 # 复制 metadata，解决 pkg_resources 相关问题
 metadata_pkgs = [
     "paddle", "paddlepaddle", "paddlepaddle-gpu", "paddleocr", "paddlex", 
+    # Prefer dynamically including whichever CUDA runtime is installed.
+    # Try cu12 family first (ignore if not installed), then cu11 family.
     "nvidia-cuda-runtime-cu12", "nvidia-cudnn-cu12", "nvidia-cublas-cu12",
     "nvidia-cufft-cu12", "nvidia-curand-cu12", "nvidia-cusolver-cu12",
     "nvidia-cusparse-cu12", "nvidia-nvjitlink-cu12",
+    "nvidia-cuda-runtime-cu11", "nvidia-cudnn-cu11", "nvidia-cublas-cu11",
+    "nvidia-cufft-cu11", "nvidia-curand-cu11", "nvidia-cusolver-cu11",
+    "nvidia-cusparse-cu11", "nvidia-nvjitlink-cu11",
     "pandas", "scipy", "sklearn", "fastapi", "uvicorn",
     "imagesize", "opencv-contrib-python", "pyclipper", "pypdfium2", "python-bidi", "shapely",
     "einops", "ftfy", "Jinja2", "lxml", "openpyxl", "premailer", "regex", "safetensors",

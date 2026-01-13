@@ -189,14 +189,29 @@ def _worker_main(task_queue, result_queue, worker_index):
         )
     except Exception as e:
         import traceback
-        logging.error(f"Failed to initialize PaddleOCR: {e}")
+        logging.error(f"Failed to initialize PaddleOCR on device={device}: {e}")
         logging.error(traceback.format_exc())
-        # Keep running to allow logging to flush, but maybe exit?
-        # If we exit here, the process dies and pool might restart it indefinitely.
-        # Let's wait a bit to ensure log is written.
-        time.sleep(1)
-        # We can't really recover, so re-raise or exit.
-        raise e
+        if device == "gpu":
+            try:
+                logging.warning("Falling back to CPU due to GPU initialization failure.")
+                ocr = PaddleOCR(
+                    device="cpu",
+                    use_doc_orientation_classify=False,
+                    use_doc_unwarping=False,
+                    use_textline_orientation=True,
+                    lang="ch",
+                    ocr_version="PP-OCRv4",
+                    enable_mkldnn=True,
+                    cpu_threads=cpu_threads
+                )
+            except Exception as e2:
+                logging.error(f"CPU fallback also failed: {e2}")
+                logging.error(traceback.format_exc())
+                time.sleep(1)
+                raise e2
+        else:
+            time.sleep(1)
+            raise e
 
     logging.info(f"Worker {os.getpid()} PaddleOCR init done. ocr={ocr}")
     try:

@@ -1,0 +1,14 @@
+flask
+numpy<2.0.0
+opencv-python
+paddleocr>=2.7.0
+# paddlepaddle-gpu 将通过脚本从官方源安装，以确保 CUDA 11 版本正确
+# paddlepaddle-gpu
+# nvidia-pyindex
+nvidia-cudnn-cu11
+nvidia-cublas-cu11
+fastapi
+uvicorn
+websockets
+python-multipart
+pyinstaller
