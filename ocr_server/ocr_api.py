@@ -1,7 +1,7 @@
 import base64
 import io
 import os
-import pyautogui
+
 import requests
 
 try:
@@ -81,7 +81,7 @@ class Arc_api:
                     print(f"OCR 服务请求失败: {response.status_code}")
                     return None
             except requests.exceptions.ConnectionError:
-                 print("OCR 服务未启动或无法连接 (http://192.168.20.81:8000)")
+                 print("OCR 服务未启动或无法连接 (http://127.0.0.1:5000)")
                  return None
                 
         except Exception as e:

@@ -1,8 +1,0 @@
-flask
-numpy
-opencv-python
-paddleocr
-paddlepaddle
-fastapi
-uvicorn
-python-multipart
