@@ -8,43 +8,7 @@ import multiprocessing
 from typing import Optional, List, Dict, Any, Union
 
 # --- 自动注入 NVIDIA DLL 路径 (修复 cudnn64_9.dll 找不到的问题) ---
-if os.name == 'nt':
-    try:
-        libs = []
-        # 检测 PyInstaller 环境
-        if getattr(sys, 'frozen', False):
-            base_dir = os.path.dirname(sys.executable)
-            # 在 _internal 中查找 nvidia 相关目录
-            internal_dir = os.path.join(base_dir, '_internal')
-            if os.path.exists(internal_dir):
-                for root, dirs, files in os.walk(internal_dir):
-                    if 'nvidia' in root:
-                         libs.append(root)
-        else:
-            try:
-                import nvidia.cudnn
-                if hasattr(nvidia.cudnn, '__file__') and nvidia.cudnn.__file__:
-                    libs.append(os.path.dirname(nvidia.cudnn.__file__))
-            except ImportError:
-                pass
-            try:
-                import nvidia.cublas
-                if hasattr(nvidia.cublas, '__file__') and nvidia.cublas.__file__:
-                    libs.append(os.path.dirname(nvidia.cublas.__file__))
-            except ImportError:
-                pass
-            
-        for lib_dir in libs:
-            # 常见路径模式：包根目录, bin, lib
-            for sub in ['', 'bin', 'lib']:
-                path = os.path.join(lib_dir, sub)
-                if os.path.exists(path):
-                    os.environ['PATH'] = path + os.pathsep + os.environ['PATH']
-                    if hasattr(os, 'add_dll_directory'):
-                        try: os.add_dll_directory(path)
-                        except: pass
-    except Exception as e:
-        print(f"Warning: Failed to add NVIDIA DLL paths: {e}")
+# (已删除 GPU 相关注入代码)
 # -----------------------------------------------------------
 
 from fastapi import FastAPI, UploadFile, File, Body, HTTPException, Request
@@ -61,14 +25,14 @@ _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 os.environ.setdefault("DISABLE_MODEL_SOURCE_CHECK", "True")
 os.environ.setdefault("PADDLEOCR_HOME", os.path.join(_BASE_DIR, "paddleocr_home"))
 
-# 导入 server.py 中的 OcrProcessPool 和其他辅助函数
-# 注意：确保 server.py 在同一目录下
+# 导入 ocr_engine.py 中的 OcrProcessPool
+# 注意：确保 ocr_engine.py 在同一目录下
 try:
-    from server import OcrProcessPool
+    from ocr_engine import OcrProcessPool
 except ImportError:
     # 如果直接运行此脚本，可能需要将当前目录加入 sys.path
     sys.path.append(_BASE_DIR)
-    from server import OcrProcessPool
+    from ocr_engine import OcrProcessPool
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -80,12 +44,35 @@ async def lifespan(app: FastAPI):
     global pool
     # startup
     multiprocessing.freeze_support()
-    use_gpu = os.environ.get("OCR_USE_GPU", "False").lower() == "true"
+    use_gpu = False
+    cpu_num = os.cpu_count() or 2
+    
     if "OCR_WORKERS" in os.environ:
         worker_count = int(os.environ["OCR_WORKERS"])
     else:
-        worker_count = 1 if use_gpu else int(str(max(1, (os.cpu_count() or 2) // 2)))
+        # 性能优先策略 (Low Latency Mode)：
+        # 为了大幅降低单次请求的延迟 (Latency)，默认只启动 1 个 Worker。
+        # PaddleOCR 在 CPU 模式下，单进程多线程 (MKLDNN) 的推理速度远快于多进程单线程。
+        # 默认使用 1 个 Worker，并分配较多的 CPU 线程。
+        worker_count = 1
+    
+    if "OCR_CPU_THREADS" not in os.environ:
+        # 自动计算每个 Worker 的最佳线程数
+        # 尽可能利用所有物理核心来加速单次推理
+        # 预留 1-2 个核给系统和其他进程
+        threads_per_worker = max(4, cpu_num - 2)
+        os.environ["OCR_CPU_THREADS"] = str(threads_per_worker)
+        logging.info(f"Auto-configured OCR_CPU_THREADS={threads_per_worker} (Total CPUs={cpu_num}) for Speed")
+
     logging.info(f"Initializing OCR Process Pool with {worker_count} workers...")
+    
+    # Pre-initialize models to avoid race conditions
+    try:
+        from ocr_engine import check_and_download_models
+        check_and_download_models()
+    except Exception as e:
+        logging.error(f"Failed to pre-initialize models: {e}")
+
     pool = OcrProcessPool(worker_count=worker_count)
     yield
     # shutdown
@@ -171,9 +158,10 @@ async def ocr_predict(request: Request):
 
     # Run OCR in thread pool to avoid blocking event loop
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _run_ocr, payload, t0)
+    client_host = request.client.host if request.client else "unknown"
+    return await loop.run_in_executor(None, _run_ocr, payload, t0, client_host)
 
-def _run_ocr(payload, t0):
+def _run_ocr(payload, t0, client_host):
     try:
         timeout = float(os.environ.get("OCR_SERVER_TASK_TIMEOUT", "120"))
         res = pool.submit(payload, timeout=timeout)
@@ -183,18 +171,23 @@ def _run_ocr(payload, t0):
 
         cost_ms = (time.perf_counter() - t0) * 1000.0
         
+        log_msg = f"[{client_host}] OCR processed successfully, cost={cost_ms:.1f}ms"
+        logging.info(log_msg)
+        print(log_msg, flush=True) # Ensure it appears in console
+        
         if res.get("code") == 0:
-            logging.info("ocr_predict ok cost_ms=%.1f", cost_ms)
             return {"code": 0, "data": res.get("data")}
         
         status = int(res.get("status", 500))
-        logging.info("ocr_predict fail status=%s cost_ms=%.1f", status, cost_ms)
+        err_msg = f"[{client_host}] OCR failed status={status} cost_ms={cost_ms:.1f}"
+        logging.info(err_msg)
+        print(err_msg, flush=True)
         
         # 保持与 Flask 接口返回格式一致
         return {"code": -1, "msg": res.get("msg")} # 状态码由 FastAPI 处理，这里返回 JSON
         
     except Exception as e:
-        logging.error(f"OCR failed: {e}")
+        logging.error(f"[{client_host}] OCR failed: {e}")
         logging.error(traceback.format_exc())
         return {"code": -1, "msg": str(e)}
 
@@ -206,7 +199,8 @@ def main():
     # 检查端口是否被占用 (简单的检查，uvicorn 也会检查)
     
     logging.info(f"Starting FastAPI OCR Server on {host}:{port}")
-    uvicorn.run(app, host=host, port=port, log_level="info")
+    # 强制使用 h11 协议解析器，避免 httptools (C扩展) 在打包后出现兼容性问题
+    uvicorn.run(app, host=host, port=port, log_level="info", http="h11")
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()

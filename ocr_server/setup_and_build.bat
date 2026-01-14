@@ -45,18 +45,17 @@ echo Activating virtual environment...
 call venv_cu11\Scripts\activate
 
 echo.
-echo Installing PaddlePaddle GPU (CUDA 11.8)...
-echo This makes sure we get the version compatible with GTX 1080 (Pascal)...
-pip install paddlepaddle-gpu -i https://www.paddlepaddle.org.cn/packages/stable/cu118/
+echo Installing PaddlePaddle CPU...
+pip install paddlepaddle -i https://mirror.baidu.com/pypi/simple
 if %errorlevel% neq 0 (
-    echo [ERROR] Failed to install paddlepaddle-gpu.
+    echo [ERROR] Failed to install paddlepaddle.
     pause
     exit /b 1
 )
 
 echo.
-echo Installing other dependencies from requirements-gpu-cu11.txt...
-pip install -r requirements-gpu-cu11.txt
+echo Installing other dependencies from requirements-cpu.txt...
+pip install -r requirements-cpu.txt
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to install dependencies.
     pause

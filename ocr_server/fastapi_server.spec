@@ -33,18 +33,18 @@ hiddenimports = [
     "python_multipart",
     "pandas",
     "sklearn", 
+    "h11",
+    "lmdb",
 ]
 
 # 仅对 Paddle 相关库进行完整收集，因为它们有很多动态加载的资源
 for pkg in [
     "paddle",
     "paddleocr",
-    "paddlex",
     "pyclipper",
     "shapely",
-    "nvidia.cudnn",
-    "nvidia.cublas",
     "websockets",
+    "Cython",
 ]:
     try:
         tmp_ret = collect_all(pkg)
@@ -56,21 +56,13 @@ for pkg in [
 
 # 复制 metadata，解决 pkg_resources 相关问题
 metadata_pkgs = [
-    "paddle", "paddlepaddle", "paddlepaddle-gpu", "paddleocr", "paddlex", 
-    # Prefer dynamically including whichever CUDA runtime is installed.
-    # Try cu12 family first (ignore if not installed), then cu11 family.
-    "nvidia-cuda-runtime-cu12", "nvidia-cudnn-cu12", "nvidia-cublas-cu12",
-    "nvidia-cufft-cu12", "nvidia-curand-cu12", "nvidia-cusolver-cu12",
-    "nvidia-cusparse-cu12", "nvidia-nvjitlink-cu12",
-    "nvidia-cuda-runtime-cu11", "nvidia-cudnn-cu11", "nvidia-cublas-cu11",
-    "nvidia-cufft-cu11", "nvidia-curand-cu11", "nvidia-cusolver-cu11",
-    "nvidia-cusparse-cu11", "nvidia-nvjitlink-cu11",
+    "paddle", "paddlepaddle", "paddleocr",
     "pandas", "scipy", "sklearn", "fastapi", "uvicorn",
     "imagesize", "opencv-contrib-python", "pyclipper", "pypdfium2", "python-bidi", "shapely",
     "einops", "ftfy", "Jinja2", "lxml", "openpyxl", "premailer", "regex", "safetensors",
-    "sentencepiece", "tiktoken", "tokenizers",
+    "sentencepiece", "tiktoken", "tokenizers", "imageio", "scikit-image",
     # Paddlex base requirements
-    "aistudio-sdk", "chardet", "colorlog", "filelock", "huggingface-hub", 
+    "chardet", "colorlog", "filelock", "huggingface-hub", 
     "modelscope", "numpy", "packaging", "pillow", "prettytable", "py-cpuinfo", 
     "pydantic", "PyYAML", "requests", "ruamel.yaml", "typing-extensions", "ujson",
     "tqdm", "rich", "click", "flask", "werkzeug"
@@ -87,6 +79,7 @@ for pkg in metadata_pkgs:
         "matplotlib", "tkinter", "PyQt5", "PySide2", "wx", 
         "IPython", "notebook", "jupyter",
         "botocore", "boto3", "awscli", 
+        "httptools", "uvloop",
     ]
 
 # 尝试手动添加 paddle 的 libs 目录

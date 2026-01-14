@@ -24,7 +24,7 @@ class Arc_api:
     def __init__(self):
         if not self._initialized:
             self._http = requests.Session()
-            # 默认指向本地的新版 FastAPI 服务器 (默认端口 8000)
+            # 默认指向本地的新版 FastAPI 服务器
             self.ocr_server_url = "http://192.168.20.81:8000"
             self._initialized = True
 
@@ -34,6 +34,7 @@ class Arc_api:
             w = x2 - x1
             h = y2 - y1
             if w <= 0 or h <= 0:
+                print(f"无效的截图区域: w={w}, h={h}")
                 return None
 
             img_str = None
@@ -62,11 +63,12 @@ class Arc_api:
                             new_h = int(h * scale)
                             frame = _cv2.resize(frame, (new_w, new_h))
                         
-                        # 降低 JPEG 质量以减少网络传输耗时 (75 -> 60)
-                        ok, buf = _cv2.imencode(".jpg", frame, [_cv2.IMWRITE_JPEG_QUALITY, 60])
+                        # 提高 JPEG 质量 (60 -> 90) 以保证识别率
+                        ok, buf = _cv2.imencode(".jpg", frame, [_cv2.IMWRITE_JPEG_QUALITY, 90])
                         if ok:
                             img_str = base64.b64encode(buf.tobytes()).decode()
-                except Exception:
+                except Exception as e:
+                    print(f"mss 截图失败: {e}")
                     img_str = None
 
             if img_str is None:
@@ -79,8 +81,8 @@ class Arc_api:
                         img.thumbnail((max_side, max_side))
                         
                     buffered = io.BytesIO()
-                    # 降低 JPEG 质量
-                    img.save(buffered, format="JPEG", quality=60)
+                    # 提高 JPEG 质量
+                    img.save(buffered, format="JPEG", quality=90)
                     img_str = base64.b64encode(buffered.getvalue()).decode()
                 except Exception as e:
                     print(
@@ -100,12 +102,18 @@ class Arc_api:
 
             response = self._http.post(url, json=payload, timeout=timeout)
             if response.status_code != 200:
-                print(f"OCR 服务返回异常状态码: {response.status_code} ({base_url})")
+                print(f"OCR 服务返回异常状态码: {response.status_code} ({base_url}) - Msg: {response.text}")
                 return None
 
             res_json = response.json()
             if res_json.get("code") == 0:
-                return res_json.get("data")
+                data = res_json.get("data")
+                if not data and target_text:
+                     print(f"OCR 未找到目标文本: '{target_text}'")
+                elif not data:
+                     # 可能是图片确实没字，或者是空的
+                     pass
+                return data
             print(f"OCR 识别失败: {res_json.get('msg')} ({base_url})")
             return None
         except requests.exceptions.ConnectionError:

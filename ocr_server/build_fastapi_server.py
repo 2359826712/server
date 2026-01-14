@@ -21,27 +21,12 @@ def main():
         sys.exit(1)
 
     # 1.1 检查 GPU/CPU 依赖配置
-    use_gpu = os.environ.get("OCR_USE_GPU", "True").lower() == "true"
-    print(f"Build Configuration: OCR_USE_GPU={use_gpu}")
+    use_gpu = False
+    print(f"Build Configuration: OCR_USE_GPU={use_gpu} (Forced CPU Mode)")
     
     try:
         import paddle
-        is_compiled_with_cuda = paddle.is_compiled_with_cuda()
-        print(f"Current PaddlePaddle compiled with CUDA: {is_compiled_with_cuda}")
-        
-        if use_gpu and not is_compiled_with_cuda:
-            print("WARNING: OCR_USE_GPU=True but paddlepaddle is CPU version!")
-            print("Suggest installing GPU version:")
-            print("pip uninstall paddlepaddle")
-            print("pip install -r requirements-gpu.txt")
-            # Ask user if they want to continue? Or just warn.
-            print("Continuing build, but runtime might fail if GPU is expected...")
-            # sys.exit(1) # Uncomment to enforce
-            
-        if not use_gpu and is_compiled_with_cuda:
-            print("NOTE: OCR_USE_GPU=False but paddlepaddle-gpu is installed.")
-            print("This is generally fine (can run on CPU), but package size might be larger.")
-            
+        print(f"PaddlePaddle version: {paddle.__version__}")
     except ImportError:
         print("PaddlePaddle not found!")
         sys.exit(1)
@@ -94,18 +79,18 @@ hiddenimports = [
     "python_multipart",
     "pandas",
     "sklearn", 
+    "h11",
+    "lmdb",
 ]
 
 # 仅对 Paddle 相关库进行完整收集，因为它们有很多动态加载的资源
 for pkg in [
     "paddle",
     "paddleocr",
-    "paddlex",
     "pyclipper",
     "shapely",
-    "nvidia.cudnn",
-    "nvidia.cublas",
     "websockets",
+    "Cython",
 ]:
     try:
         tmp_ret = collect_all(pkg)
@@ -117,21 +102,13 @@ for pkg in [
 
 # 复制 metadata，解决 pkg_resources 相关问题
 metadata_pkgs = [
-    "paddle", "paddlepaddle", "paddlepaddle-gpu", "paddleocr", "paddlex", 
-    # Prefer dynamically including whichever CUDA runtime is installed.
-    # Try cu12 family first (ignore if not installed), then cu11 family.
-    "nvidia-cuda-runtime-cu12", "nvidia-cudnn-cu12", "nvidia-cublas-cu12",
-    "nvidia-cufft-cu12", "nvidia-curand-cu12", "nvidia-cusolver-cu12",
-    "nvidia-cusparse-cu12", "nvidia-nvjitlink-cu12",
-    "nvidia-cuda-runtime-cu11", "nvidia-cudnn-cu11", "nvidia-cublas-cu11",
-    "nvidia-cufft-cu11", "nvidia-curand-cu11", "nvidia-cusolver-cu11",
-    "nvidia-cusparse-cu11", "nvidia-nvjitlink-cu11",
+    "paddle", "paddlepaddle", "paddleocr",
     "pandas", "scipy", "sklearn", "fastapi", "uvicorn",
     "imagesize", "opencv-contrib-python", "pyclipper", "pypdfium2", "python-bidi", "shapely",
     "einops", "ftfy", "Jinja2", "lxml", "openpyxl", "premailer", "regex", "safetensors",
-    "sentencepiece", "tiktoken", "tokenizers",
+    "sentencepiece", "tiktoken", "tokenizers", "imageio", "scikit-image",
     # Paddlex base requirements
-    "aistudio-sdk", "chardet", "colorlog", "filelock", "huggingface-hub", 
+    "chardet", "colorlog", "filelock", "huggingface-hub", 
     "modelscope", "numpy", "packaging", "pillow", "prettytable", "py-cpuinfo", 
     "pydantic", "PyYAML", "requests", "ruamel.yaml", "typing-extensions", "ujson",
     "tqdm", "rich", "click", "flask", "werkzeug"
@@ -148,6 +125,7 @@ for pkg in metadata_pkgs:
         "matplotlib", "tkinter", "PyQt5", "PySide2", "wx", 
         "IPython", "notebook", "jupyter",
         "botocore", "boto3", "awscli", 
+        "httptools", "uvloop",
     ]
 
 # 尝试手动添加 paddle 的 libs 目录
@@ -230,6 +208,58 @@ coll = COLLECT(
 
     print("\nBuild completed!")
     print(f"Executable is located at: {os.path.join(dist_dir, 'ocr_server_fastapi_v4', 'ocr_server_fastapi_v4.exe')}")
+
+    # 4. Create run_server.bat
+    bat_content = r"""@echo off
+setlocal
+echo Starting OCR Server (CPU Mode)...
+set DISABLE_MODEL_SOURCE_CHECK=True
+set OCR_SERVER_TASK_TIMEOUT=120
+cd /d "%~dp0ocr_server_fastapi_v4"
+if exist "ocr_server_fastapi_v4.exe" (
+    echo Found executable, launching...
+    ocr_server_fastapi_v4.exe
+) else (
+    echo [ERROR] ocr_server_fastapi_v4.exe not found
+    pause
+)
+"""
+    bat_path = os.path.join(dist_dir, "run_server.bat")
+    with open(bat_path, "w", encoding="utf-8") as f:
+        f.write(bat_content)
+    print(f"Created startup script: {bat_path}")
+
+    # 5. Create test_local_connectivity.py
+    test_content = r"""import requests
+import time
+import sys
+
+def test_local_health():
+    url = "http://127.0.0.1:8000/ping"
+    print(f"Checking {url}...")
+    for i in range(10):
+        try:
+            resp = requests.get(url, timeout=5)
+            print(f"Attempt {i+1}: Status Code: {resp.status_code}")
+            if resp.status_code == 200:
+                print("[SUCCESS] Server is responsive locally.")
+                return True
+        except Exception as e:
+            print(f"Attempt {i+1}: Failed to connect: {e}")
+        time.sleep(2)
+    print("[FAILURE] Server did not respond after 10 attempts.")
+    return False
+
+if __name__ == "__main__":
+    if test_local_health():
+        sys.exit(0)
+    else:
+        sys.exit(1)
+"""
+    test_path = os.path.join(dist_dir, "test_local_connectivity.py")
+    with open(test_path, "w", encoding="utf-8") as f:
+        f.write(test_content)
+    print(f"Created test script: {test_path}")
 
 if __name__ == "__main__":
     main()
