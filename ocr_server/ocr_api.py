@@ -37,7 +37,7 @@ class Arc_api:
         self._sct = mss.mss() if _has_mss else None
         print(f"DEBUG: Has MSS: {_has_mss}, SCT: {self._sct is not None}")
 
-    def ocr_text(self, x1, y1, x2, y2, target_text="", timeout=5, max_side=480, use_angle_cls=False):
+    def ocr_text(self, x1, y1, x2, y2, target_text="", timeout=5, max_side=480, use_angle_cls=False, det=True):
         """
         截图并调用本地 OCR 服务进行识别 (不保存图片文件)
         """
@@ -82,6 +82,7 @@ class Arc_api:
                 "target_text": target_text,
                 "max_side": max_side,
                 "use_angle_cls": use_angle_cls,
+                "det": det,
             }
 
             try:

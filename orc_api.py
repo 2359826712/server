@@ -1,8 +1,10 @@
 import base64
 import io
 import os
-import pyautogui
 import requests
+import time
+import numpy as _np
+import cv2 as _cv2
 
 try:
     import mss
@@ -11,6 +13,11 @@ try:
 except Exception:
     _has_mss = False
 
+try:
+    import pyautogui as _pyautogui
+    _has_pyautogui = True
+except Exception:
+    _has_pyautogui = False
 
 class Arc_api:
     _instance = None
@@ -26,9 +33,11 @@ class Arc_api:
         if server_url:
             self.server_url = server_url
         else:
-            self.server_url = "http://127.0.0.1:5000/ocr"
+            self.server_url = "http://192.168.20.81:5000/ocr"
+        self._sct = mss.mss() if _has_mss else None
+        print(f"DEBUG: Has MSS: {_has_mss}, SCT: {self._sct is not None}")
 
-    def ocr_text(self, x1, y1, x2, y2, target_text="", timeout=5, max_side=480, use_angle_cls=False):
+    def ocr_text(self, x1, y1, x2, y2, target_text="", timeout=5, max_side=480, use_angle_cls=False, det=True):
         """
         截图并调用本地 OCR 服务进行识别 (不保存图片文件)
         """
@@ -39,39 +48,48 @@ class Arc_api:
                 print("无效的截图区域")
                 return None
             
+            t0 = time.time()
             # 强制使用 pyautogui 截图，规避 mss 可能导致的崩溃
-            if _has_mss:
+            if _has_mss and self._sct:
             # if False: 
-                with mss.mss() as sct:
-                    monitor = {"left": x1, "top": y1, "width": w, "height": h}
-                    shot = sct.grab(monitor)
-                    import numpy as _np
-                    import cv2 as _cv2
-                    # BGRA -> BGR
-                    frame = _np.array(shot)[:, :, :3]
-                    frame = _cv2.cvtColor(frame, _cv2.COLOR_BGRA2BGR)
-                    # 编码为 JPEG，降低开销
-                    ok, buf = _cv2.imencode('.jpg', frame, [_cv2.IMWRITE_JPEG_QUALITY, 75])
-                    if not ok:
-                        raise Exception("mss 编码失败")
-                    img_str = base64.b64encode(buf.tobytes()).decode()
+                monitor = {"left": x1, "top": y1, "width": w, "height": h}
+                shot = self._sct.grab(monitor)
+                t0_1 = time.time()
+                # BGRA -> BGR
+                frame = _np.array(shot)[:, :, :3]
+                frame = _cv2.cvtColor(frame, _cv2.COLOR_BGRA2BGR)
+                t0_2 = time.time()
+                # 编码为 JPEG，降低开销
+                ok, buf = _cv2.imencode('.jpg', frame, [_cv2.IMWRITE_JPEG_QUALITY, 75])
+                t0_3 = time.time()
+                if not ok:
+                    raise Exception("mss 编码失败")
+                img_str = base64.b64encode(buf.tobytes()).decode()
+                t0_4 = time.time()
+                print(f"DEBUG: Grab: {(t0_1-t0)*1000:.2f}ms, Cvt: {(t0_2-t0_1)*1000:.2f}ms, Enc: {(t0_3-t0_2)*1000:.2f}ms, B64: {(t0_4-t0_3)*1000:.2f}ms", flush=True)
             else:
-                # print(f"截图区域: {x1},{y1} {w}x{h}")
-                img = pyautogui.screenshot(region=(x1, y1, w, h))
+                if not _has_pyautogui:
+                    raise Exception("pyautogui 未安装，且 mss 不可用")
+                img = _pyautogui.screenshot(region=(x1, y1, w, h))
                 buffered = io.BytesIO()
                 img.save(buffered, format="JPEG")
                 img_str = base64.b64encode(buffered.getvalue()).decode()
             
+            t1 = time.time()
             url = self.server_url
             payload = {
                 "image_base64": img_str,
                 "target_text": target_text,
                 "max_side": max_side,
                 "use_angle_cls": use_angle_cls,
+                "det": det,
             }
 
             try:
+                t2 = time.time()
                 response = self._http.post(url, json=payload, timeout=timeout)
+                t3 = time.time()
+                print(f"DEBUG: Screenshot+Encode: {(t1-t0)*1000:.2f}ms, Request: {(t3-t2)*1000:.2f}ms", flush=True)
                 if response.status_code == 200:
                     res_json = response.json()
                     if res_json.get("code") == 0:
