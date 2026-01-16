@@ -21,9 +21,13 @@ class Arc_api:
             cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self):
+    def __init__(self, server_url=None):
         self._http = requests.Session()
-    
+        if server_url:
+            self.server_url = server_url
+        else:
+            self.server_url = "http://127.0.0.1:5000/ocr"
+
     def ocr_text(self, x1, y1, x2, y2, target_text="", timeout=5, max_side=480, use_angle_cls=False):
         """
         截图并调用本地 OCR 服务进行识别 (不保存图片文件)
@@ -58,17 +62,14 @@ class Arc_api:
                 img.save(buffered, format="JPEG")
                 img_str = base64.b64encode(buffered.getvalue()).decode()
             
-            # 构造请求
-            url = "http://192.168.20.81:8000/ocr"
-            # url = "http://127.0.0.1:5000/ocr"
+            url = self.server_url
             payload = {
                 "image_base64": img_str,
                 "target_text": target_text,
                 "max_side": max_side,
-                "use_angle_cls": use_angle_cls
+                "use_angle_cls": use_angle_cls,
             }
-            
-            # 发送请求
+
             try:
                 response = self._http.post(url, json=payload, timeout=timeout)
                 if response.status_code == 200:
@@ -82,7 +83,7 @@ class Arc_api:
                     print(f"OCR 服务请求失败: {response.status_code}")
                     return None
             except requests.exceptions.ConnectionError:
-                 print("OCR 服务未启动或无法连接 (http://192.168.20.81:8000)")
+                 print(f"OCR 服务未启动或无法连接 ({self.server_url})")
                  return None
                 
         except Exception as e:
