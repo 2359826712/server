@@ -51,7 +51,7 @@ class OCREngine:
              paddle.device.set_device("cpu")
 
         self.ocr = PaddleOCR(
-            use_angle_cls=True,
+            use_angle_cls=False,
             lang=settings.OCR_LANG,
             use_gpu=self.use_gpu,
             show_log=False,
@@ -89,7 +89,7 @@ class OCREngine:
             new_h = int(h * scale)
             img = cv2.resize(img, (new_w, new_h))
             
-        result = self.ocr.ocr(img, cls=True)
+        result = self.ocr.ocr(img, cls=False)
         
         parsed_data = []
         if result and result[0]:

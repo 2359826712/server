@@ -4,6 +4,7 @@ cd /d "%~dp0"
 set DISABLE_MODEL_SOURCE_CHECK=True
 set PADDLEPDX_NO_NETWORK=True
 set PYTHONPATH=%CD%
+set OCR_LANG=ch
 set "PYTHON_BASE=%LOCALAPPDATA%\Programs\Python\Python312\Lib\site-packages\nvidia"
 set "CUDNN_BIN=%PYTHON_BASE%\cudnn\bin"
 set "CUBLAS_BIN=%PYTHON_BASE%\cublas\bin"

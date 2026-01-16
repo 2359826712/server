@@ -24,7 +24,7 @@ class Arc_api:
     def __init__(self):
         self._http = requests.Session()
     
-    def ocr_text(self, x1, y1, x2, y2, target_text="", timeout=5, max_side=720, use_angle_cls=False):
+    def ocr_text(self, x1, y1, x2, y2, target_text="", timeout=5, max_side=480, use_angle_cls=False):
         """
         截图并调用本地 OCR 服务进行识别 (不保存图片文件)
         """
@@ -59,7 +59,8 @@ class Arc_api:
                 img_str = base64.b64encode(buffered.getvalue()).decode()
             
             # 构造请求
-            url = "http://127.0.0.1:5000/ocr"
+            url = "http://192.168.20.81:8000/ocr"
+            # url = "http://127.0.0.1:5000/ocr"
             payload = {
                 "image_base64": img_str,
                 "target_text": target_text,
@@ -88,7 +89,7 @@ class Arc_api:
             print(f"OCR 调用异常: {e}")
             return None
 
-    def ocr_recognize(self, x1, y1, x2, y2, target_text="", timeout=5, max_side=720, use_angle_cls=False):
+    def ocr_recognize(self, x1, y1, x2, y2, target_text="", timeout=5, max_side=480, use_angle_cls=False):
         data = self.ocr_text(x1, y1, x2, y2, target_text=target_text, timeout=timeout, max_side=max_side, use_angle_cls=use_angle_cls)
         if not data:
             return None
