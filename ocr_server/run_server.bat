@@ -22,6 +22,7 @@ if %errorlevel% neq 0 (
 )
 
 :: 3. 启动服务
+set OCR_VERSION=PP-OCRv4
 python ocr_server_other/server.py
 if %errorlevel% neq 0 (
     echo.

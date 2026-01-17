@@ -66,7 +66,17 @@ def load_model_config() -> ModelConfig:
     从环境变量加载模型选择配置。
     """
     ocr_version = os.environ.get("OCR_VERSION", "PP-OCRv3")
-    rec_model_name = os.environ.get("OCR_REC_MODEL_NAME", "PP-OCRv3_mobile_rec")
+    rec_model_name = os.environ.get("OCR_REC_MODEL_NAME")
+
+    if not rec_model_name:
+        ocr_ver_upper = ocr_version.upper()
+        if ocr_ver_upper.startswith("PP-OCRV4"):
+            rec_model_name = "PP-OCRv4_mobile_rec"
+        elif ocr_ver_upper.startswith("PP-OCRV3"):
+            rec_model_name = "PP-OCRv3_mobile_rec"
+        else:
+            rec_model_name = "PP-OCRv3_mobile_rec"
+
     return ModelConfig(ocr_version=ocr_version, rec_model_name=rec_model_name)
 
 
