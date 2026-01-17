@@ -108,8 +108,8 @@ class Arc_api:
             print(f"OCR 调用异常: {e}")
             return None
 
-    def ocr_recognize(self, x1, y1, x2, y2, target_text="", timeout=5, max_side=480, use_angle_cls=False):
-        data = self.ocr_text(x1, y1, x2, y2, target_text=target_text, timeout=timeout, max_side=max_side, use_angle_cls=use_angle_cls)
+    def ocr_recognize(self, x1, y1, x2, y2, target_text="", timeout=5, max_side=480, use_angle_cls=False, det=True):
+        data = self.ocr_text(x1, y1, x2, y2, target_text=target_text, timeout=timeout, max_side=max_side, use_angle_cls=use_angle_cls, det=det)
         if not data:
             return None
         def _rect_from_box(box):

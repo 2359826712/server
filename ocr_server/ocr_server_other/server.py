@@ -222,10 +222,14 @@ class OcrEngine:
         [{"text": str, "confidence": float, "box": [[x,y] * 4]}, ...]
         """
         if det:
-            result = self._ocr.ocr(img, use_textline_orientation=use_angle_cls)
-            return self._parse_det_result(result, target_text)
-        result = self._rec_model.predict(img)
-        return self._parse_rec_only_result(img, result, target_text)
+            det_result = self._ocr.ocr(img, use_textline_orientation=use_angle_cls)
+            parsed_det = self._parse_det_result(det_result, target_text)
+            if parsed_det:
+                return parsed_det
+            rec_result = self._rec_model.predict(img)
+            return self._parse_rec_only_result(img, rec_result, target_text)
+        rec_result = self._rec_model.predict(img)
+        return self._parse_rec_only_result(img, rec_result, target_text)
 
     def _parse_det_result(self, result, target_text: str | None) -> list[dict]:
         parsed_result: list[dict] = []

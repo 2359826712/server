@@ -15,18 +15,18 @@ def test_ocr_engine_det_mode():
     img = _build_dummy_image()
     result = ocr_engine.run(img, det=True, use_angle_cls=False, target_text=None)
     assert isinstance(result, list)
-    if result:
-        item = result[0]
-        assert "text" in item and "confidence" in item and "box" in item
+    assert len(result) > 0
+    item = result[0]
+    assert "text" in item and "confidence" in item and "box" in item
 
 
 def test_ocr_engine_rec_only_mode():
     img = _build_dummy_image()
     result = ocr_engine.run(img, det=False, use_angle_cls=False, target_text=None)
     assert isinstance(result, list)
-    if result:
-        item = result[0]
-        assert "text" in item and "confidence" in item and "box" in item
+    assert len(result) > 0
+    item = result[0]
+    assert "text" in item and "confidence" in item and "box" in item
 
 
 def bench_ocr_engine():
@@ -43,4 +43,3 @@ if __name__ == "__main__":
     test_ocr_engine_det_mode()
     test_ocr_engine_rec_only_mode()
     bench_ocr_engine()
-
