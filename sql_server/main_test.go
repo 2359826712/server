@@ -48,11 +48,12 @@ func TestClient(t *testing.T) {
 func TestHttpQuery(t *testing.T) {
 	client := http.Client{}
 	do := client.Do
-	for i := 0; i < 3000; i++ {
-		testQuery(i, do)
-	}
+	//for i := 0; i < 3000; i++ {
+	//	testQuery(i, do)
+	//}
+	testInsert(do)
 	//testReset(do)
-	time.Sleep(time.Minute)
+	time.Sleep(10 * time.Second)
 }
 
 func testReset(do func(req *http.Request) (*http.Response, error)) {
@@ -107,4 +108,29 @@ func testQuery(index int, do func(req *http.Request) (*http.Response, error)) {
 		panic(fmt.Errorf("read body err: %v", err))
 	}
 	fmt.Println("用时： ", time.Since(start).Milliseconds(), "ms ", index, "--->>", string(data))
+}
+
+func testInsert(do func(req *http.Request) (*http.Response, error)) {
+	start := time.Now()
+	url := "http://192.168.20.99:9096/insert"
+	q := &model.BaseInfo{
+		GameName: "gta5",
+		Account:  "11111111",
+	}
+	b, _ := json.Marshal(q)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
+	if err != nil {
+		panic(fmt.Errorf("req err: %v", err))
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := do(req)
+	if err != nil {
+		panic(fmt.Errorf("client err: %v", err))
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		panic(fmt.Errorf("read body err: %v", err))
+	}
+	fmt.Println("用时： ", time.Since(start).Milliseconds(), "ms ", "--->>", string(data))
 }

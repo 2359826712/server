@@ -1,6 +1,7 @@
 package mysql_server
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sql_server/global"
@@ -8,13 +9,15 @@ import (
 	"sql_server/model/request"
 	"time"
 
+	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
 )
 
-var MysqlService = mysqlService{locker: &lockList{}}
+var MysqlService = mysqlService{locker: &lockList{}, sem: semaphore.NewWeighted(500)}
 
 type mysqlService struct {
 	locker *lockList
+	sem    *semaphore.Weighted
 }
 
 // 创建表
@@ -33,7 +36,16 @@ func (m *mysqlService) Insert(base *model.BaseInfo) error {
 	if err != nil {
 		return err
 	}
+	if len(list) == 0 {
+		return nil
+	}
 	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+		if err = m.sem.Acquire(ctx, 1); err != nil {
+			return
+		}
+		defer m.sem.Release(1)
 		for _, v := range list {
 			_ = m.insert(v)
 		}
@@ -133,7 +145,8 @@ func (m *mysqlService) Query(query *request.QueryReq) (list []*model.BaseInfo, e
 		return nil, err
 	}
 	if len(list) == 0 {
-		return Query(query), nil
+		//return Query(query), nil
+		return nil, nil
 	}
 	if err = m.updateTalkTime(list, talkChannel); err != nil {
 		return nil, err

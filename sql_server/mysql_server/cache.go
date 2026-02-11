@@ -80,6 +80,7 @@ func Query(query *request.QueryReq) []*model.BaseInfo {
 	insertList := inserts[query.GameName]
 	if insertList == nil {
 		insertList = make(map[string]*model.Account)
+		mu.Unlock()
 		return nil
 	}
 	mu.Unlock()

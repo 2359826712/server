@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"sql_server/config"
-	"time"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -34,8 +33,8 @@ func InitGormDb(ms config.Mysql) *gorm.DB {
 	sqlDB, _ := db.DB()
 	sqlDB.SetMaxIdleConns(50)
 	sqlDB.SetMaxOpenConns(2000)
-	sqlDB.SetConnMaxLifetime(time.Hour)
-	sqlDB.SetConnMaxIdleTime(30 * time.Minute)
+	// sqlDB.SetConnMaxLifetime(time.Hour)
+	// sqlDB.SetConnMaxIdleTime(30 * time.Minute)
 	return db
 }
 

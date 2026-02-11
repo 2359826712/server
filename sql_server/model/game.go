@@ -10,7 +10,7 @@ import (
 type BaseInfo struct {
 	ID       int    `json:"ID" gorm:"primaryKey"`
 	GameName string `json:"game_name"` // 用作表名
-	Account  string `json:"account"`
+	Account  string `json:"account" gorm:"index"`
 	BZone    string `json:"b_zone"` //大区
 	SZone    string `json:"s_zone"` //小区
 	Rating   int    `json:"rating"` //等级
