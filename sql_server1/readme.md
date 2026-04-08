@@ -3,9 +3,9 @@
 // 字段名:
 // GameName string `json:"game_name"` // 用作表名
 // Account  string `json:"account"`
-// BZone    string `json:"b_zone"` //大区
-// SZone    string `json:"s_zone"` //小区
-// Rating   int    `json:"rating"` //等级
+// EmailAccount   string `json:"email_account"` //邮箱账号
+// EmailPassword  string `json:"email_password"` //邮箱密码
+// Address        string `json:"address"` //地址
 // OnlineDuration int `json:"online_duration"` // 在线时长, 单位分钟
 // TalkChannel    int `json:"talk_channel"` // 1-6
 ```
@@ -24,9 +24,9 @@ Content-Type: application/json
 {
   "game_name": "fsjs",
   "account": "hao123.com",
-  "b_zone": "b",
-  "s_zone": "s",
-  "rating": 10
+  "email_account": "test@example.com",
+  "email_password": "password",
+  "address": "addr"
 }
 
 ###
@@ -39,31 +39,21 @@ Content-Type: application/json
   "talk_channel": 1,
   "cnt": 2
 }
-
-###
-POST http://192.168.2.99:9091/clearTalkChannel
-Content-Type: application/json
-
-{
-  "game_name": "fsjs",
-  "talk_channel": 1
-}
 ```
-
 
 ### tcp 客户端
 
 - 发包格式(小端序)
  1. 包长 uint32   4bytes, 总长包含包长的4字节
- 2. cmd命令 byte( 1:创建新表, 2: 新增, 3:更新, 4:查询, 5:清理喊话通道)
+ 2. cmd命令 byte( 1:创建新表, 2: 新增, 3:更新, 4:查询)
  3. 数据内容json格式
 ```go
 // 字段名:
 // GameName string `json:"game_name"` // 用作表名
 // Account  string `json:"account"`
-// BZone    string `json:"b_zone"` //大区
-// SZone    string `json:"s_zone"` //小区
-// Rating   int    `json:"rating"` //等级
+// EmailAccount   string `json:"email_account"` //邮箱账号
+// EmailPassword  string `json:"email_password"` //邮箱密码
+// Address        string `json:"address"` //地址
 // OnlineDuration int `json:"online_duration"` // 在线时长, 单位分钟
 // TalkChannel    int `json:"talk_channel"` // 1-6
 ```
@@ -73,12 +63,12 @@ Content-Type: application/json
 ```
 5. 新增
 ```go
-包长(包长4字节+cmd 1字节+len(json->bytes))+cmd(新增2)+struct:game_name, account, bzone, szone, rating(json格式)
+包长(包长4字节+cmd 1字节+len(json->bytes))+cmd(新增2)+struct:game_name, account, email_account, email_password, address(json格式)
 更新也可以用
 ```
 6. 查询
 ```go
-包长(包长4字节+cmd 1字节+len(json->bytes))+cmd(新增2)+struct:game_name, account, bzone, szone, rating, online_duration, talk_channel(json格式)
+包长(包长4字节+cmd 1字节+len(json->bytes))+cmd(新增2)+struct:game_name, account, email_account, email_password, address, online_duration, talk_channel(json格式)
 ```
 
 

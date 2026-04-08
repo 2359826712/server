@@ -23,8 +23,21 @@ func handlePack(buf []byte) response.ResponseResult {
 		return update(buf)
 	case Query:
 		return query(buf)
+	case ClearStatus:
+		return clearStatus(buf)
 	}
 	return response.Fail(fmt.Sprintf("命令%d暂无", cmd))
+}
+
+func clearStatus(buf []byte) response.ResponseResult {
+	g := &model.BaseInfo{}
+	if err := json.Unmarshal(buf, g); err != nil {
+		return response.Fail(err.Error())
+	}
+	if err := mysql_server.MysqlService.ClearStatus(g.GameName); err != nil {
+		return response.Fail(err.Error())
+	}
+	return response.OK()
 }
 
 func createNewGameTable(buf []byte) response.ResponseResult {

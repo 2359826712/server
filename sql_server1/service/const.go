@@ -5,7 +5,7 @@ const (
 	Insert             byte = 2
 	Update             byte = 3
 	Query              byte = 4
-	ClearTalkChannel   byte = 5
+	ClearStatus        byte = 5
 )
 
 const (

@@ -97,8 +97,17 @@ func (m *mysqlService) update(game *model.BaseInfo) error {
 	}
 	db := global.DB.Table(game.GameName).Where("account = ?", game.Account)
 	updates := map[string]interface{}{}
-	if game.Level != "" {
-		updates["level"] = game.Level
+	if game.Password != "" {
+		updates["password"] = game.Password
+	}
+	if game.EmailAccount != "" {
+		updates["email_account"] = game.EmailAccount
+	}
+	if game.EmailPassword != "" {
+		updates["email_password"] = game.EmailPassword
+	}
+	if game.Address != "" {
+		updates["address"] = game.Address
 	}
 	if game.ComputerNumber != "" {
 		updates["computer_number"] = game.ComputerNumber
@@ -129,32 +138,19 @@ func (m *mysqlService) Delete(game *model.BaseInfo) error {
 	return db.Delete(&model.Account{}).Error
 }
 
-func (m *mysqlService) updateTalkTime(list []*model.BaseInfo, talkChannel string) error {
-	if talkChannel == "" {
-		return errors.New("talk_channel is empty")
-	}
-	now := time.Now()
-	for _, gm := range list {
-		if err := global.DB.Table(gm.GameName).Where("id = ?", gm.ID).Update(talkChannel, now).Error; err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (m *mysqlService) ClearTalkTime(gameName string, talkChannel uint) error {
+func (m *mysqlService) ClearStatus(gameName string) error {
 	if err := checkGameName(gameName); err != nil {
 		return err
 	}
 	lock := m.locker.getLock(gameName)
-
 	lock.Lock()
 	defer lock.Unlock()
-	field, err := getTalkChannel(talkChannel)
-	if err != nil {
-		return err
+	updates := map[string]interface{}{
+		"computer_number": "",
+		"in_use":          "false",
+		"status":          0,
 	}
-	return global.DB.Table(gameName).Where("id >= 0").Update(field, "2000-01-01 00:00:00").Error
+	return global.DB.Table(gameName).Where("id >= 0").Updates(updates).Error
 }
 
 func (m *mysqlService) Query(query *request.QueryReq) (list []*model.BaseInfo, err error) {
@@ -174,14 +170,14 @@ func (m *mysqlService) Query(query *request.QueryReq) (list []*model.BaseInfo, e
 		if gm.Account != "" {
 			db = db.Where("account = ?", gm.Account)
 		}
-		if gm.BZone != "" {
-			db = db.Where("b_zone = ?", gm.BZone)
+		if gm.EmailAccount != "" {
+			db = db.Where("email_account = ?", gm.EmailAccount)
 		}
-		if gm.SZone != "" {
-			db = db.Where("s_zone = ?", gm.SZone)
+		if gm.EmailPassword != "" {
+			db = db.Where("email_password = ?", gm.EmailPassword)
 		}
-		if gm.Level != "" {
-			db = db.Where("level = ?", gm.Level)
+		if gm.Address != "" {
+			db = db.Where("address = ?", gm.Address)
 		}
 		if gm.ComputerNumber != "" {
 			db = db.Where("computer_number = ?", gm.ComputerNumber)
@@ -203,27 +199,4 @@ func (m *mysqlService) Query(query *request.QueryReq) (list []*model.BaseInfo, e
 		return list, nil
 	}
 	return list, err
-}
-
-func getTalkChannel(talkChannel uint) (string, error) {
-	field := ""
-	switch talkChannel {
-	case 0:
-		return "", nil
-	case 1:
-		field = "last_talk_time1"
-	case 2:
-		field = "last_talk_time2"
-	case 3:
-		field = "last_talk_time3"
-	case 4:
-		field = "last_talk_time4"
-	case 5:
-		field = "last_talk_time5"
-	case 6:
-		field = "last_talk_time6"
-	default:
-		return "", fmt.Errorf("喊话通道%d暂无", talkChannel)
-	}
-	return field, nil
 }

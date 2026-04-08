@@ -18,6 +18,7 @@ func StartHttpServer() {
 	router.POST("/update", api.UpdateApi)
 	router.POST("/delete", api.DeleteApi)
 	router.POST("/query", api.QueryApi)
+	router.POST("/clearStatus", api.ClearStatusApi)
 	// 启动 HTTP 服务器
 	log.Printf("start http server, port: %d\n", global.Config.Service.HttpPort)
 	address := fmt.Sprintf(":%d", global.Config.Service.HttpPort)

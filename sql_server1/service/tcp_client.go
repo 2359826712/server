@@ -90,16 +90,14 @@ func (c *Client) Close() {
 // 客户端
 // 发包形式
 // 包长 uint32   4bytes
-// 命令 byte( 0:创建新表, 1: 新增, 2:更新, 3:查询, 4:清理喊话通道)
+// 命令 byte( 1:创建新表, 2: 新增, 3:更新, 4:查询, 5:清空状态)
 // 内容: json数据
 // 字段名:
 // GameName string `json:"game_name"` // 用作表名
 // BaseInfo  string `json:"account"`
-// BZone    string `json:"b_zone"` //大区
-// SZone    string `json:"s_zone"` //小区
-// Rating   int    `json:"rating"` //等级
-// OnlineDuration int `json:"online_duration"` // 在线时长, 单位分钟
-// TalkChannel    int `json:"talk_channel"` // 1-6
+// EmailAccount    string `json:"email_account"` //邮箱账号
+// EmailPassword   string `json:"email_password"` //邮箱密码
+// Address         string `json:"address"` //地址
 
 func (c *Client) sendPack(data any, cmd byte) error {
 	pack, err := json.Marshal(&data)
@@ -133,6 +131,9 @@ func (c *Client) Query(query request.QueryReq) error {
 	return c.sendPack(query, Query)
 }
 
-func (c *Client) ClearTalkChannel(query request.QueryReq) error {
-	return c.sendPack(query, ClearTalkChannel)
+func (c *Client) ClearStatus(gameName string) error {
+	game := model.BaseInfo{
+		GameName: gameName,
+	}
+	return c.sendPack(game, ClearStatus)
 }

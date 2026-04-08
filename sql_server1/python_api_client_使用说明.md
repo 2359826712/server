@@ -10,7 +10,6 @@ Python API客户端是一个用于调用SQL Server HTTP接口的工具，它是�
    - 创建新游戏
    - 插入数据
    - 查询数据
-   - 清除聊天通道
 
 2. **详细的调试功能**
    - 可开启/关闭的调试输出
@@ -67,51 +66,87 @@ python python_api_client.py create test_game
 2. **插入数据**
 
 ```bash
-python python_api_client.py insert <game_name> <account> <b_zone> <s_zone> <rating>
+python python_api_client.py insert <game_name> <account> <password> <email_account> <email_password> <address>
 ```
 
 参数说明：
 - `game_name`: 游戏名称
 - `account`: 账号
-- `b_zone`: 大区号
-- `s_zone`: 小区号
-- `rating`: 评分（整数）
+- `password`: 密码
+- `email_account`: 邮箱账号
+- `email_password`: 邮箱密码
+- `address`: 地址
 
 示例：
 ```bash
-python python_api_client.py insert test_game user123 zone1 subzone1 100
+python python_api_client.py insert test_game user123 pass123 test@example.com emailpass addr
 ```
 
-3. **查询数据**
+3. **更新数据**
 
 ```bash
-python python_api_client.py query <game_name> [online_duration] [talk_channel] [cnt]
+python python_api_client.py update <game_name> <account> [--password <password>] [--email_account <email_account>] [--email_password <email_password>] [--address <address>] [--computer_number <computer_number>] [--status <status>] [--in_use|--not_in_use]
 ```
 
 参数说明：
 - `game_name`: 游戏名称
-- `online_duration`: 在线时长（分钟，默认：1）
-- `talk_channel`: 聊天频道（默认：0）
-- `cnt`: 查询数量（默认：100）
+- `account`: 账号
+- `--password`: 密码（可选）
+- `--email_account`: 邮箱账号（可选）
+- `--email_password`: 邮箱密码（可选）
+- `--address`: 地址（可选）
+- `--computer_number`: 机器号（可选）
+- `--status`: 状态（可选，整数）
+- `--in_use`: 设置为使用中（可选）
+- `--not_in_use`: 设置为未使用（可选）
 
 示例：
 ```bash
-python python_api_client.py query test_game 60 1 10
+python python_api_client.py update test_game user123 --address addr2 --status 1 --not_in_use
 ```
 
-4. **清除聊天通道**
+4. **删除数据**
 
 ```bash
-python python_api_client.py clear <game_name> <talk_channel>
+python python_api_client.py delete <game_name> <account>
 ```
 
 参数说明：
 - `game_name`: 游戏名称
-- `talk_channel`: 聊天频道
+- `account`: 账号
 
 示例：
 ```bash
-python python_api_client.py clear test_game 1
+python python_api_client.py delete test_game user123
+```
+
+5. **查询数据**
+
+```bash
+python python_api_client.py query <game_name> [--cnt <cnt>]
+```
+
+参数说明：
+- `game_name`: 游戏名称
+- `--cnt`: 查询数量（默认：100）
+
+示例：
+```bash
+python python_api_client.py query test_game --cnt 10
+```
+
+6. **清空状态**
+
+```bash
+python python_api_client.py clearstatus <game_name>
+```
+
+参数说明：
+- `game_name`: 游戏名称
+
+示例：
+```bash
+python python_api_client.py clearstatus test_game
 ```
 
 ### 调试选项
@@ -257,7 +292,7 @@ $ python python_api_client.py create test_game --debug
 Python API客户端也可以作为模块导入到其他Python脚本中使用：
 
 ```python
-from python_api_client import create_new_game, insert_data, query_data, clear_talk_channel
+from python_api_client import create_new_game, insert_data, query_data
 
 # 创建新游戏
 create_new_game("test_game")
@@ -267,9 +302,6 @@ insert_data("test_game", "user123", "zone1", "subzone1", 100)
 
 # 查询数据
 query_data("test_game", 60, 1, 10)
-
-# 清除聊天通道
-clear_talk_channel("test_game", 1)
 ```
 
 ### 自定义配置

@@ -12,11 +12,11 @@ type BaseInfo struct {
 	GameName       string `json:"game_name"`
 	Account        string `json:"account"`
 	Password       string `json:"password"`
-	BZone          string `json:"b_zone"`
-	SZone          string `json:"s_zone"`
+	EmailAccount   string `json:"email_account"`
+	EmailPassword  string `json:"email_password"`
 	Status         int    `json:"status"`
 	InUse          string `json:"in_use"`
-	Level          string `json:"level"`
+	Address        string `json:"address"`
 	ComputerNumber string `json:"computer_number"`
 }
 
@@ -33,23 +33,59 @@ func AutoMigrate(gameName string) error {
 		game_name VARCHAR(255),
 	    account VARCHAR(255),
 		password VARCHAR(255),
-	    b_zone VARCHAR(255),
-	    s_zone VARCHAR(255),
+	    email_account VARCHAR(255),
+	    email_password VARCHAR(255),
 	    status INT,
 	    in_use VARCHAR(5) NOT NULL DEFAULT 'false',
-	    level VARCHAR(255),
+	    address VARCHAR(255),
 	    computer_number VARCHAR(255));`, gameName)
 	if err := global.DB.Exec(createTableSQL).Error; err != nil {
 		return fmt.Errorf("Failed to create table %s: %v", gameName, err)
 	}
-	var levelCnt int
-	if err := global.DB.Raw("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = 'level'", global.Config.Mysql.Dbname, gameName).Scan(&levelCnt).Error; err != nil {
+	columnCnt := func(columnName string) (int, error) {
+		var cnt int
+		if err := global.DB.Raw("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?", global.Config.Mysql.Dbname, gameName, columnName).Scan(&cnt).Error; err != nil {
+			return 0, err
+		}
+		return cnt, nil
+	}
+	ensureRenameOrAdd := func(oldCol, newCol, afterCol string) (int, error) {
+		newCnt, err := columnCnt(newCol)
+		if err != nil {
+			return 0, err
+		}
+		oldCnt, err := columnCnt(oldCol)
+		if err != nil {
+			return 0, err
+		}
+		if newCnt == 0 && oldCnt > 0 {
+			if err := global.DB.Exec(fmt.Sprintf("ALTER TABLE `%s` CHANGE COLUMN `%s` `%s` VARCHAR(255)", gameName, oldCol, newCol)).Error; err != nil {
+				return 0, err
+			}
+			return 1, nil
+		}
+		if newCnt == 0 {
+			if err := global.DB.Exec(fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN `%s` VARCHAR(255) AFTER `%s`", gameName, newCol, afterCol)).Error; err != nil {
+				return 0, err
+			}
+			return 1, nil
+		}
+		if oldCnt > 0 {
+			if err := global.DB.Exec(fmt.Sprintf("UPDATE `%s` SET `%s` = `%s` WHERE (`%s` IS NULL OR `%s` = '') AND (`%s` IS NOT NULL AND `%s` <> '')", gameName, newCol, oldCol, newCol, newCol, oldCol, oldCol)).Error; err != nil {
+				return newCnt, err
+			}
+		}
+		return newCnt, nil
+	}
+	if _, err := ensureRenameOrAdd("b_zone", "email_account", "password"); err != nil {
 		return err
 	}
-	if levelCnt == 0 {
-		if err := global.DB.Exec(fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN `level` VARCHAR(255) AFTER `in_use`", gameName)).Error; err != nil {
-			return err
-		}
+	if _, err := ensureRenameOrAdd("s_zone", "email_password", "email_account"); err != nil {
+		return err
+	}
+	addressCnt, err := ensureRenameOrAdd("level", "address", "in_use")
+	if err != nil {
+		return err
 	}
 	var computerCnt int
 	if err := global.DB.Raw("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = 'computer_number'", global.Config.Mysql.Dbname, gameName).Scan(&computerCnt).Error; err != nil {
@@ -57,8 +93,8 @@ func AutoMigrate(gameName string) error {
 	}
 	if computerCnt == 0 {
 		afterCol := "in_use"
-		if levelCnt > 0 {
-			afterCol = "level"
+		if addressCnt > 0 {
+			afterCol = "address"
 		}
 		if err := global.DB.Exec(fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN `computer_number` VARCHAR(255) AFTER `%s`", gameName, afterCol)).Error; err != nil {
 			return err

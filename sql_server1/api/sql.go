@@ -114,6 +114,25 @@ func DeleteApi(c *gin.Context) {
 	})
 }
 
+func ClearStatusApi(c *gin.Context) {
+	var game model.BaseInfo
+	if err := c.ShouldBindJSON(&game); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := validatorGameName(game.GameName); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := mysql_server.MysqlService.ClearStatus(game.GameName); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"message": "clear status success",
+	})
+}
+
 func validatorGameName(gameName string) error {
 	if gameName == "" {
 		return errors.New("游戏名不能为空, 因为是通过游戏名来确认表名")
